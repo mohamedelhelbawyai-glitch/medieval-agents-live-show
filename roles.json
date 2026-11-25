@@ -1,5 +1,5 @@
 {
-  "_comment": "Each key is an agent name (the subagent_type Claude Code launches). 'look' picks a sprite, 'body' and 'accent' recolour it, 'home' is where the character stands when its own tool activity is unknown. Places: castle (town hall), library (wizard tower), forge, barracks, market, docks (east gate), farm, tavern (inn), chapel, arena, theatre.",
+  "_comment": "Each key is an agent name (the subagent_type Claude Code launches). 'look' picks a sprite, 'body' and 'accent' recolour it, 'home' is where the character stands when its own tool activity is unknown. Places: castle, library, forge, barracks, market, docks, farm, tavern, arena, theatre.",
   "roles": {
     "orchestrator": { "name": "Lord Aldric", "title": "Conductor", "look": "governor", "home": "castle",
       "tasks": ["Routes work to the right agent", "Splits tasks and hands off between phases", "Collects results and reports to you"] },
