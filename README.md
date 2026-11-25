@@ -36,6 +36,14 @@ It listens on `http://localhost:4747` (change with `--port`). Other commands:
 | `agent-realm install-hooks` | Only add the hooks |
 | `agent-realm uninstall-hooks [--all]` | Remove hooks (`--all` also removes `/realm` and the CLAUDE.md block) |
 
+## The side panel
+
+The sidebar is a menu. Pick a button to see that view in place of the menu, and use **MENU** to go back:
+
+- **Logs**: every event, newest at the bottom.
+- **Tasks**: the tasks running right now, with who is doing them, where, and for how long.
+- **Agents**: every character in the town with a live status (working, traveling, resting, on duty, reporting, failed).
+
 ## 3. Connect Claude Code
 
 Run this once in the project you want to watch:

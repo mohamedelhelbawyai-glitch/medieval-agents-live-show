@@ -28,29 +28,15 @@
       <div><b id="sEvents">0</b><span>EVENTS</span></div>
       <div><b id="sErrors">0</b><span>FAILS</span></div>
     </section>
-    <h2>THE ROSTER</h2>
-    <ul id="roster"></ul>
-    <h2>TOWN CRIER</h2>
-    <div id="log"></div>
-    <details open>
-      <summary>THE CAST</summary>
-      <ul id="cast" class="cast"></ul>
-    </details>
-    <details>
-      <summary>MAP KEY</summary>
-      <ul class="key">
-        <li><i style="background:#c0394b"></i>Castle &mdash; Task, plans</li>
-        <li><i style="background:#3a5cc0"></i>Library &mdash; Read, Grep, Glob</li>
-        <li><i style="background:#b07a3c"></i>Forge &mdash; Edit, Write, builds</li>
-        <li><i style="background:#8a94a8"></i>Barracks &mdash; shell commands</li>
-        <li><i style="background:#7b3a96"></i>Market &mdash; Web search/fetch</li>
-        <li><i style="background:#2f7a5a"></i>Docks &mdash; MCP, deploys</li>
-        <li><i style="background:#c8e65a"></i>Archives &mdash; data, memory, DB</li>
-        <li><i style="background:#ffcf70"></i>Arena &mdash; test runs are fights</li>
-        <li><i style="background:#ff9ec0"></i>Theatre &mdash; reports are shows</li>
-        <li><i style="background:#d9a521"></i>Tavern, arena stands, theatre seats &mdash; breaks</li>
-      </ul>
-    </details>
+    <nav id="menu">
+      <button data-view="logs"><span>LOGS</span><em id="cLogs">0</em></button>
+      <button data-view="tasks"><span>TASKS</span><em id="cTasks">0</em></button>
+      <button data-view="agents"><span>AGENTS</span><em id="cAgents">0</em></button>
+    </nav>
+    <section id="view" hidden>
+      <div class="viewbar"><button id="back">&#9664; MENU</button><h2 id="viewTitle"></h2></div>
+      <div id="viewBody"></div>
+    </section>
   </aside>
 </div>
 <script src="game.js"></script>

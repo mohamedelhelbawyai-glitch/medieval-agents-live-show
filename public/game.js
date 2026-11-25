@@ -399,7 +399,7 @@ function spawn(id, ev, loc) {
   el.append(bub, nm); overlay.append(el);
   const [x, y] = nodePx(GATE);
   const a = { id, rid, look, pal, color, name, title, home, x, y, path: [], node: GATE, loc: null, slot: null, state: 'idle', busy: false, busyUntil: 0, hold: false, holdUntil: 0, facing: 1,
-    anim: Math.random() * 9, lastEvent: now(), status: 'idle', text: '', el, bub, bubUntil: 0, partT: 0, leaving: false };
+    anim: Math.random() * 9, lastEvent: now(), status: 'idle', text: '', task: '', tool: '', taskStart: 0, el, bub, bubUntil: 0, partT: 0, leaving: false };
   agents.set(id, a); return a;
 }
 
@@ -437,6 +437,7 @@ function emit(ev) {
   const a = agents.get(id) || spawn(id, ev, loc);
   const t = now();
   a.lastEvent = t; a.status = status; a.text = text;
+  if (status === 'start' && (a.task !== text || !a.taskStart || !isRunning(a))) { a.task = text; a.taskStart = t; a.tool = tool; }
   if (ev.hold === true) { a.hold = true; } else if (ev.hold === false || status === 'idle') a.hold = false;
   if (a.hold) a.holdUntil = t + 600;
   a.busy = status === 'start' || report; a.busyUntil = t + (report ? 8 : a.hold ? 600 : 10);
@@ -539,37 +540,86 @@ function frame(ms) {
 }
 
 /* ---------------------------------------------------------------- UI */
+const logs = [];                       // every event, newest last (kept even while the Logs view is closed)
+let view = null;                       // null = menu, else 'logs' | 'tasks' | 'agents'
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+const fmtTime = s => { s = Math.max(0, Math.floor(s)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+const placeName = a => a.leaving ? 'LEAVING' : a.state === 'walking' ? 'ON THE ROAD' : (LOC[a.loc] ? LOC[a.loc].name : '');
+
+function logRow(l) {
+  const d = el('div', 'ev ' + l.status);
+  d.append(el('time', '', l.time));
+  const who = el('b', '', l.name + ' '); who.style.color = l.color; who.style.fontWeight = 'normal';
+  d.append(who, el('span', '', (l.status === 'done' ? 'finished: ' : l.status === 'error' ? 'FAILED: ' : l.status === 'report' ? 'reports: ' : l.status === 'idle' ? 'rests: ' : '') + l.text));
+  return d;
+}
 function logEvent(a, text, status) {
-  const log = $('#log'), d = document.createElement('div'); d.className = 'ev ' + status;
-  const tm = document.createElement('time'); tm.textContent = new Date().toTimeString().slice(0, 8);
-  const who = document.createElement('b'); who.textContent = a.name + ' '; who.style.color = a.color; who.style.fontWeight = 'normal';
-  const sp = document.createElement('span'); sp.textContent = (status === 'done' ? 'finished: ' : status === 'error' ? 'FAILED: ' : status === 'report' ? 'reports: ' : status === 'idle' ? 'rests: ' : '') + text;
-  d.append(tm, who, sp);
-  const stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
-  log.append(d); while (log.children.length > 80) log.firstChild.remove();
-  if (stick) log.scrollTop = log.scrollHeight;
+  const l = { time: new Date().toTimeString().slice(0, 8), name: a.name, color: a.color, status, text };
+  logs.push(l); if (logs.length > 300) logs.shift();
+  if (view === 'logs') {
+    const box = $('#log'), stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+    box.append(logRow(l)); while (box.children.length > 300) box.firstChild.remove();
+    if (stick) box.scrollTop = box.scrollHeight;
+  }
 }
-function refreshUi() {
+
+function statusOf(a) {
+  if (a.leaving) return ['LEAVING', 'idle'];
+  if (a.status === 'error' && a.busy === false && now() - a.lastEvent < 8) return ['FAILED', 'failed'];
+  if (a.state === 'walking') return ['TRAVELING', 'walking'];
+  if (a.loc === 'theatre' && a.busy) return ['REPORTING', 'reporting'];
+  if (a.state === 'working') return ['WORKING', 'working'];
+  if (a.hold) return ['ON DUTY', 'duty'];
+  if (REST.includes(a.loc)) return ['RESTING', 'resting'];
+  return ['IDLE', 'idle'];
+}
+const isRunning = a => (a.status === 'start' && a.busy) || a.hold;
+
+function renderTasks(body) {
+  const list = [...agents.values()].filter(isRunning).sort((p, q) => p.taskStart - q.taskStart);
+  if (!list.length) { body.append(el('div', 'empty', 'No tasks running. The town is quiet.')); return; }
+  const t = now();
+  for (const a of list) {
+    const c = el('div', 'card'); c.style.setProperty('--c', a.color);
+    const top = el('div', 'top'); top.append(el('span', 'nm2', a.name + (a.title ? ' · ' + a.title : '')), el('span', 'pill working', fmtTime(t - a.taskStart)));
+    c.append(top, el('div', 'txt', a.task || a.text || '...'), el('div', 'meta', (a.tool ? a.tool.toUpperCase() + ' · ' : '') + placeName(a)));
+    body.append(c);
+  }
+}
+function renderAgents(body) {
+  const list = [...agents.values()];
+  if (!list.length) { body.append(el('div', 'empty', 'No agents in the realm yet.')); return; }
+  for (const a of list) {
+    const [label, cls] = statusOf(a), c = el('div', 'card'); c.style.setProperty('--c', a.color);
+    const top = el('div', 'top'); top.append(el('span', 'nm2', a.name + (a.title ? ' · ' + a.title : '')), el('span', 'pill ' + cls, label));
+    c.append(top, el('div', 'txt', a.text || 'Waiting for work'), el('div', 'meta', placeName(a) + ' · last activity ' + fmtTime(now() - a.lastEvent) + ' ago'));
+    body.append(c);
+  }
+}
+
+function showView(name) {
+  view = name;
+  $('#menu').hidden = !!name; $('#view').hidden = !name;
+  if (!name) return;
+  $('#viewTitle').textContent = name.toUpperCase();
+  const body = $('#viewBody'); body.textContent = '';
+  if (name === 'logs') {
+    const box = el('div'); box.id = 'log'; body.append(box);
+    if (!logs.length) box.append(el('div', 'empty', 'Nothing has happened yet.'));
+    for (const l of logs) box.append(logRow(l));
+    box.scrollTop = box.scrollHeight;
+  } else refreshUi(true);
+}
+function refreshUi(force) {
   $('#sAgents').textContent = agents.size; $('#sEvents').textContent = stats.events; $('#sErrors').textContent = stats.errors;
-  const ul = $('#roster'); ul.textContent = '';
-  for (const a of agents.values()) {
-    const li = document.createElement('li'); li.style.setProperty('--c', a.color); if (a.status === 'error') li.classList.add('error');
-    const n = document.createElement('span'); n.className = 'n'; n.textContent = a.name + (a.title ? ' · ' + a.title : '');
-    const w = document.createElement('span'); w.className = 'w'; w.textContent = a.leaving ? 'LEAVING' : a.state === 'walking' ? 'TRAVELS' : (LOC[a.loc] ? LOC[a.loc].name : '');
-    li.append(n, w); ul.append(li);
+  $('#cLogs').textContent = logs.length; $('#cAgents').textContent = agents.size; $('#cTasks').textContent = [...agents.values()].filter(isRunning).length;
+  if (view === 'tasks' || view === 'agents') {
+    const body = $('#viewBody'), top = body.scrollTop; body.textContent = '';
+    (view === 'tasks' ? renderTasks : renderAgents)(body); body.scrollTop = top;
   }
 }
-function buildCast() {
-  const ul = $('#cast'); ul.textContent = '';
-  for (const [id, r] of Object.entries(ROLEDEF)) {
-    const li = document.createElement('li'); const look = LOOKS[r.look] || LOOKS.knight;
-    const i = document.createElement('i'); i.style.background = look.color;
-    const b = document.createElement('b'); b.textContent = r.name; b.style.fontWeight = 'normal'; b.style.color = look.color;
-    const t = document.createElement('span'); t.textContent = ' · ' + (r.title || id);
-    const d = document.createElement('small'); d.textContent = (r.tasks || []).join('. ');
-    li.append(i, b, t, d); ul.append(li);
-  }
-}
+document.querySelectorAll('#menu button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
+$('#back').addEventListener('click', () => showView(null));
 
 function fit() {
   const wrap = $('#wrap'), box = $('#box'), pad = 24;
@@ -596,7 +646,7 @@ function connect() {
 window.Realm = { emit, setBadge };
 
 buildStatic(); fit();
-const rolesLoaded = location.protocol === 'file:' ? Promise.resolve() : fetch('/roles.json').then(r => r.json()).then(j => { ROLEDEF = j.roles || {}; buildCast(); }).catch(() => {});
+const rolesLoaded = location.protocol === 'file:' ? Promise.resolve() : fetch('/roles.json').then(r => r.json()).then(j => { ROLEDEF = j.roles || {}; }).catch(() => {});
 rolesLoaded.then(() => {
   connect();
   if (/[?&]demo\b/.test(location.search)) setTimeout(() => { window.RealmSim.start(); setBadge(); }, 300);
