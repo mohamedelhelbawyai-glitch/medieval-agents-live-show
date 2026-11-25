@@ -404,7 +404,9 @@ function spawn(id, ev, loc) {
   agents.set(id, a); return a;
 }
 
-function goTo(a, loc) {
+function pathLen(a) { let d = 0, x = a.x, y = a.y; for (const p of a.path) { d += Math.hypot(p[0] - x, p[1] - y); x = p[0]; y = p[1]; } return d; }
+
+function goTo(a, loc, calm) {
   const L = LOC[loc]; if (!L) return;
   a.loc = loc; a.leaving = false;
   const taken = new Set([...agents.values()].filter(o => o !== a && o.loc === loc && o.slot).map(o => o.slot));
@@ -416,6 +418,8 @@ function goTo(a, loc) {
   for (const k of bfs(a.node, L.node).slice(1)) a.path.push(nodePx(k));
   a.node = L.node;
   const [px, py] = footPx(s[0], s[1]); const p = [px + rand(-3, 3), py + rand(-1, 1)]; p.slot = true; a.path.push(p);
+  const len = pathLen(a);
+  a.speed = calm ? clamp(len / 6, 56, 120) : clamp(len / 2.5, 70, 320);   // working trips hurry so the task isn't over before they arrive
 }
 
 function say(a, text, status, secs, label) {
@@ -441,8 +445,9 @@ function emit(ev) {
   if (status === 'start' && (a.task !== text || !a.taskStart || !isRunning(a))) { a.task = text; a.taskStart = t; a.tool = tool; }
   if (ev.hold === true) { a.hold = true; } else if (ev.hold === false || status === 'idle') a.hold = false;
   if (a.hold) a.holdUntil = t + 600;
-  a.busy = status === 'start' || report; a.busyUntil = t + (report ? 8 : a.hold ? 600 : 10);
-  if (a.loc !== loc || a.leaving) goTo(a, loc);
+  a.busy = status !== 'idle' || report; a.workFor = report ? 8 : status === 'start' ? (a.hold ? 600 : 10) : 2.5;
+  if (a.loc !== loc || a.leaving) goTo(a, loc, status === 'idle' && !report);
+  a.busyUntil = a.path.length ? Infinity : t + a.workFor;   // the work timer starts when they arrive
   say(a, text, status === 'idle' ? 'start' : status, report ? 6 : status === 'start' ? 6 : 3.5, report ? 'REPORT' : '');
   if (status === 'done') burst(a.x, a.y - 14, '#ffd23f', 8);
   if (status === 'error') { burst(a.x, a.y - 14, '#e5484d', 10); stats.errors++; }
@@ -456,9 +461,9 @@ const LOCATION_FX = { forge: ['#ff9a2a', 0.12], barracks: ['#ffffff', 0.4], libr
   castle: ['#ffd23f', 0.7], tavern: ['#ff9ec0', 0.8], arena: ['#ffffff', 0.14], theatre: ['#ff9ec0', 0.4] };
 
 function updateAgent(a, dt, t) {
-  a.anim += dt;
+  a.anim += dt * (a.path.length ? clamp((a.speed || 56) / 70, 1, 2.2) : 1);
   if (a.path.length) {
-    const p = a.path[0], dx = p[0] - a.x, dy = p[1] - a.y, d = Math.hypot(dx, dy), step = 56 * dt;
+    const p = a.path[0], dx = p[0] - a.x, dy = p[1] - a.y, d = Math.hypot(dx, dy), step = (a.speed || 56) * dt;
     if (d <= step) { a.x = p[0]; a.y = p[1]; a.path.shift(); } else { a.x += dx / d * step; a.y += dy / d * step; if (Math.abs(dx) > .5) a.facing = dx > 0 ? 1 : -1; }
     a.state = 'walking';
   } else {
@@ -467,11 +472,13 @@ function updateAgent(a, dt, t) {
     if (a.loc === 'arena' && a.slot) { const sx = +a.slot.split(',')[0]; a.facing = sx <= 43 ? -1 : sx >= 49 ? 1 : sx < 46 ? 1 : -1; }   // face the dummy or the sparring partner
     if (a.loc === 'theatre' || a.loc === 'audience' || a.loc === 'stands') a.facing = a.loc === 'stands' ? (a.x < 736 ? 1 : -1) : a.facing;
   }
+  if (!a.path.length && a.busyUntil === Infinity) a.busyUntil = t + (a.workFor || 5);   // just arrived: start the work timer
   if (a.busy && t > a.busyUntil) a.busy = false;
+  if (a.path.length && a.bubUntil) a.bubUntil = Math.max(a.bubUntil, t + 3);          // keep the bubble up until they get there
   if (a.hold && t > a.holdUntil) a.hold = false;
   const idleFor = t - a.lastEvent;
-  if (!a.leaving && !a.hold && idleFor > 16 && !REST.includes(a.loc) && !a.path.length) { a.busy = false; goTo(a, pickRest()); }
-  if (!a.leaving && !a.hold && idleFor > 120) { a.leaving = true; a.loc = null; a.slot = null; if (a.path.length && a.path[a.path.length - 1].slot) a.path.pop(); else if (!a.path.length) a.path.push(nodePx(a.node)); for (const k of bfs(a.node, GATE).slice(1)) a.path.push(nodePx(k)); a.node = GATE; }
+  if (!a.leaving && !a.hold && idleFor > 16 && !REST.includes(a.loc) && !a.path.length) { a.busy = false; goTo(a, pickRest(), true); }
+  if (!a.leaving && !a.hold && idleFor > 120) { a.leaving = true; a.loc = null; a.slot = null; if (a.path.length && a.path[a.path.length - 1].slot) a.path.pop(); else if (!a.path.length) a.path.push(nodePx(a.node)); for (const k of bfs(a.node, GATE).slice(1)) a.path.push(nodePx(k)); a.node = GATE; a.speed = 110; }
   a.cheer = a.state === 'idle' && ((a.loc === 'stands' && fightOn) || (a.loc === 'audience' && showOn));
   const fx = a.state === 'working' ? LOCATION_FX[a.loc] : a.cheer ? ['#ffd23f', 0.8] : null;
   if (fx) { a.partT -= dt; if (a.partT <= 0) { a.partT = fx[1] * rand(.7, 1.3); burst(a.x + (a.cheer ? 0 : a.facing * 8), a.y - (a.cheer ? 20 : 6), fx[0], a.cheer ? 1 : 2, .7); } }

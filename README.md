@@ -148,7 +148,7 @@ Failed tool calls (Qwen Code and Cursor report them) show a red FAILED bubble. W
 
 The side panel is a menu: **Logs** (every event), **Tasks** (what is running right now and for how long), **Agents**
 (everyone in town with a live status). Zoom with the **+ / − / FIT** buttons or **Ctrl/⌘ + scroll**, and drag to pan.
-`?demo` in the URL starts a simulated cast. An earlier pixel-art town map is kept under the git tag `pixel-town-map`.
+Characters hurry when they have work: any trip takes about 2.5 seconds however far, the work timer starts when they arrive, and the bubble stays up until they do, so a quick tool call is never over before they get there. `?demo` in the URL starts a simulated cast. An earlier pixel-art town map is kept under the git tag `pixel-town-map`.
 
 ## Commands
 
