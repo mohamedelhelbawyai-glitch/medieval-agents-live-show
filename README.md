@@ -100,22 +100,28 @@ folder (picked up automatically), or pass `agent-realm start --roles my-roles.js
 
 ### Where they stand
 
-The **tool** an agent is using decides the place; the role decides who it is.
+The map is a pixel-art walled town ([`public/assets/town.jpg`](public/assets/town.jpg)). The **tool** an agent is using
+decides the place; the role decides who it is.
 
-| Place | Tools | Nature of work |
-|---|---|---|
-| Castle | Task, TodoWrite, plans | Delegation and planning |
-| Library | Read, Grep, Glob | Reading, research, reviewing |
-| Forge | Edit, Write, build commands | Writing code |
-| Barracks | other shell commands | Running things |
-| Market | WebSearch, WebFetch | Looking things up outside |
-| Docks | `mcp__*` tools, deploy commands | External services |
-| Archives (farm) | database, memory tools | Data |
-| **Arena** | test commands (`npm test`, `flutter test`, `pytest`...) | **Tests are fights**: the agent duels a training dummy |
-| **Theatre** | a Stop / subagent finishing | **Reports are shows**: the agent presents its result on stage |
-| Tavern, arena stands, theatre seats | idle | Breaks: idle agents drink, watch a fight, or watch a show |
+| Place | On the map | Tools | Nature of work |
+|---|---|---|---|
+| Town Hall | clock-tower hall | Task, TodoWrite, plans | Delegation and planning |
+| Library | wizard tower | Read, Grep, Glob | Reading, research, reviewing |
+| Forge | open smithy | Edit, Write, build commands | Writing code |
+| Barracks | the barn by the south road | other shell commands | Running things |
+| Market | the stalls | WebSearch, WebFetch | Looking things up outside |
+| East Gate | east bridge | `mcp__*` tools, deploy commands | External services |
+| Farm | the crop fields | database, memory tools | Data |
+| **Arena** | west fountain square | test commands (`npm test`, `flutter test`, `pytest`...) | **Tests are fights**: dummies and banners appear while a tournament is on |
+| **Theatre** | east fountain square | a Stop / subagent finishing | **Reports are shows**: a stage appears while someone presents |
+| Inn, chapel, arena stands, theatre seats | tavern, church, the squares | idle | Breaks: idle agents drink, pray, watch a fight, or watch a show |
 
-When a role has no tool activity of its own (for example while a subagent is running), it stands at its `home` place.
+When a role has no tool activity of its own (for example while a subagent is running), it stands at its `home` place
+from `roles.json`. Agents start at the south gate and walk the town's roads.
+
+**Using a different map:** replace `public/assets/town.jpg` and edit the `ROADS` and `LOC` tables near the top of
+`public/game.js` (coordinates are pixels of the source image). Open the page with `?debug` to draw the walking graph
+(red) and every standing slot (cyan) over the map while you calibrate.
 
 ### How subagents are detected
 
@@ -134,7 +140,7 @@ curl -X POST localhost:4747/event -H 'Content-Type: application/json' \
 
 Fields: `agent` (id, required), `status` (`start` | `done` | `error` | `idle`), `tool`, `text`, and optional
 `role` (a key from roles.json), `name`, `project`, `location` (castle, library, forge, barracks, market, docks, farm,
-tavern, arena, theatre), `activity: "report"` (present on the theatre stage) and `hold: true` (stay on duty until a
+tavern, chapel, arena, theatre), `activity: "report"` (present on the theatre stage) and `hold: true` (stay on duty until a
 later event for the same agent).
 
 ## Notes

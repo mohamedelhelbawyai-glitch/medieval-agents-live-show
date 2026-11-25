@@ -1,7 +1,8 @@
 // Agent Realm server: serves the town, accepts agent events, streams them to browsers (SSE).
 const http = require('http'), fs = require('fs'), path = require('path');
 const PUB = path.join(__dirname, 'public');
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.webp': 'image/webp' };
 
 // roles.json lookup order: --roles, REALM_ROLES, ./agent-realm.roles.json, bundled roles.json
 function findRoles(opt) {
