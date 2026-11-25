@@ -1,0 +1,8 @@
+{
+  "hooks": {
+    "PreToolUse":   [{ "matcher": "*", "hooks": [{ "type": "command", "command": "agent-realm hook # agent-realm" }] }],
+    "PostToolUse":  [{ "matcher": "*", "hooks": [{ "type": "command", "command": "agent-realm hook # agent-realm" }] }],
+    "Notification": [{ "hooks": [{ "type": "command", "command": "agent-realm hook # agent-realm" }] }],
+    "Stop":         [{ "hooks": [{ "type": "command", "command": "agent-realm hook # agent-realm" }] }]
+  }
+}

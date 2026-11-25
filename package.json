@@ -1,0 +1,28 @@
+{
+  "name": "agent-realm",
+  "version": "0.2.0",
+  "description": "A live pixel-art medieval town where your working AI agents appear as knights, merchants, farmers and more.",
+  "bin": {
+    "agent-realm": "bin/agent-realm.js"
+  },
+  "main": "server.js",
+  "files": [
+    "bin",
+    "claude",
+    "public",
+    "server.js",
+    "hook.js",
+    "README.md"
+  ],
+  "scripts": {
+    "start": "node bin/agent-realm.js start"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mohamedelhelbawyai-glitch/medieval-agents-live-show.git"
+  }
+}

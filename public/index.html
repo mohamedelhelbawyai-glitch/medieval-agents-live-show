@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent Realm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <main id="wrap">
+    <div id="box">
+      <canvas id="stage"></canvas>
+      <div id="overlay"></div>
+      <div id="hud"><span id="clock">DAY 1 09:00</span></div>
+      <div id="empty">NO AGENTS IN THE REALM YET<small>Send events to /event or press DEMO</small></div>
+    </div>
+  </main>
+  <aside id="side">
+    <header>
+      <h1>AGENT REALM</h1>
+      <div class="row"><span id="live" class="badge off">OFFLINE</span><button id="demoBtn">DEMO &#9654;</button></div>
+    </header>
+    <section class="stats">
+      <div><b id="sAgents">0</b><span>AGENTS</span></div>
+      <div><b id="sEvents">0</b><span>EVENTS</span></div>
+      <div><b id="sErrors">0</b><span>FAILS</span></div>
+    </section>
+    <h2>THE ROSTER</h2>
+    <ul id="roster"></ul>
+    <h2>TOWN CRIER</h2>
+    <div id="log"></div>
+    <details>
+      <summary>MAP KEY</summary>
+      <ul class="key">
+        <li><i style="background:#c0394b"></i>Castle &mdash; Task, plans</li>
+        <li><i style="background:#3a5cc0"></i>Library &mdash; Read, Grep, Glob</li>
+        <li><i style="background:#b07a3c"></i>Forge &mdash; Edit, Write</li>
+        <li><i style="background:#8a94a8"></i>Barracks &mdash; Bash</li>
+        <li><i style="background:#7b3a96"></i>Market &mdash; Web search/fetch</li>
+        <li><i style="background:#2f7a5a"></i>Docks &mdash; MCP tools</li>
+        <li><i style="background:#c8e65a"></i>Farm &mdash; data, memory, DB</li>
+        <li><i style="background:#d9a521"></i>Tavern &mdash; idle, done</li>
+      </ul>
+    </details>
+  </aside>
+</div>
+<script src="game.js"></script>
+<script src="sim.js"></script>
+</body>
+</html>
