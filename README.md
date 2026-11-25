@@ -67,6 +67,24 @@ Requires Node 18 or newer. There are no runtime dependencies.
 If the `agent-realm` on your PATH is older than the one doing the install, the installer says so and points
 the hooks at the new copy instead, so an old global install can never break a newer hook.
 
+## Update
+
+```bash
+agent-realm update
+```
+
+It compares your installed commit with the latest one on GitHub, shows what changed, and reinstalls with
+`npm install -g github:mohamedelhelbawyai-glitch/medieval-agents-live-show`. Restart a running show afterwards.
+
+| Option | Meaning |
+|---|---|
+| `--check` | Only say whether a newer version exists (exit code 2 if so, 0 if current); installs nothing |
+| `--hooks` | After updating, refresh the hooks of agents that already have them, to pick up any new hook events |
+| `--force` | Reinstall even if you already have the latest |
+
+Your hooks call `agent-realm hook`, so they use the new version automatically. Your settings, cast file and hooks are not touched
+unless you pass `--hooks`. If you run from a git clone, `update` tells you to `git pull` instead. It contacts `github.com` only when you run it.
+
 ## How it works
 
 1. **Hooks.** Each agent runs `agent-realm hook <agent>` around its tool calls. It reads the agent's own payload from stdin.
@@ -145,6 +163,7 @@ The side panel is a menu: **Logs** (every event), **Tasks** (what is running rig
 | `agent-realm roles [--init]` | List the cast, or write an editable copy here |
 | `agent-realm emit --agent a1 --tool Bash --status start --text "npm test"` | Send a test event |
 | `agent-realm status` | Is the show running? |
+| `agent-realm update [--check] [--hooks] [--force]` | Get the latest version from GitHub (see [Update](#update)) |
 
 Setup options (for `init` and `hooks install` / `uninstall`):
 
@@ -177,7 +196,7 @@ Agent Realm runs on your machine and talks only to `127.0.0.1`.
 - **What it never carries:** file contents, prompts, model replies, transcripts, or environment variables. A unit test plants a secret in
   the file-content and prompt fields and checks it never appears in an event.
 - **Stricter:** set `REALM_REDACT=1` in your environment and events carry tool names only. No commands, file names or queries.
-- **Local only:** the server binds to `127.0.0.1`, and `POST /event` requires a JSON content type so other websites can't inject events.
+- **Local only:** the server binds to `127.0.0.1` (the only outside contact is `agent-realm update`, which asks github.com for the latest commit), and `POST /event` requires a JSON content type so other websites can't inject events.
 - **Non-destructive setup:** your other settings are kept, the original file is backed up, and uninstall puts the original back
   byte for byte (tested), including removing files and folders the installer created.
 
@@ -201,7 +220,7 @@ roles.json), `name`, `project`, `location` (castle, library, forge, barracks, ma
 | Nothing appears | `agent-realm hooks status`: is the show running and the agent connected? Restart the agent so it loads hooks. |
 | Codex shows nothing | Open `/hooks` in Codex and trust the Agent Realm entries. Hosted web search doesn't fire Codex hooks. |
 | Qwen Code project hooks don't run | Approve them at startup, or install at user scope (the default). |
-| "PATH has an older version" | `npm install -g github:mohamedelhelbawyai-glitch/medieval-agents-live-show`, then re-run `hooks install`. |
+| "PATH has an older version" | `agent-realm update` (or the `npm install -g github:...` command), then re-run `hooks install`. |
 | A tool shows up in the wrong place | See what your agent really sends: `REALM_DEBUG=/tmp/realm-hooks.log`, then read the file. |
 | Remove everything | `agent-realm hooks uninstall --all --scope user` (and `--scope project` per project) |
 
@@ -224,6 +243,7 @@ What is verified and what isn't, plainly:
 bin/agent-realm.js   the CLI
 lib/adapters.js      one payload adapter per agent (pure functions, unit-tested)
 lib/agents.js        detect, install and uninstall per agent
+lib/update.js        `agent-realm update`: check GitHub and reinstall
 hook.js              the hook entry point the agents call
 server.js            local server (events in, live stream out)
 roles.json           the default cast

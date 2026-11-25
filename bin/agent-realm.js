@@ -4,6 +4,7 @@ const fs = require('fs'), path = require('path'), http = require('http'), cp = r
 const ROOT = path.resolve(__dirname, '..');
 const pkg = require('../package.json');
 const agents = require('../lib/agents');
+const upd = require('../lib/update');
 
 const tty = process.stdout.isTTY, c = (n, s) => tty ? `\x1b[${n}m${s}\x1b[0m` : s;
 const bold = s => c(1, s), dim = s => c(2, s), green = s => c(32, s), yellow = s => c(33, s), red = s => c(31, s), gold = s => c(33, bold(s));
@@ -19,6 +20,7 @@ ${bold('Commands')}
   start        Run the live show                 [--port 4747] [--no-open] [--demo] [--roles file]
   init         Guided setup: hooks + instruction files for the agents it finds
   hooks        install | uninstall | status       hooks only, no instruction files
+  update       Get the latest version from GitHub    [--check] [--hooks] [--force]
   status       Is the show running?
   emit         Send a test event                 --agent a1 --tool Bash --status start --text "npm test"
   roles        List the cast; --init writes an editable agent-realm.roles.json here
@@ -29,7 +31,12 @@ ${bold('Setup options')} (init, hooks install | uninstall)
   --scope user | project                   user = all projects (default), project = this folder only
   --dry-run                                show what would change, write nothing
   --yes                                    do not ask for confirmation
-  --all                                    (uninstall) also remove instruction files`;
+  --all                                    (uninstall) also remove instruction files
+
+${bold('Update options')}
+  --check    only say whether a newer version exists, install nothing
+  --hooks    after updating, refresh the hooks of agents that already have them (picks up new events)
+  --force    reinstall even if you already have the latest`;
 
 function parse(argv) {
   const out = { _: [], f: {} };
@@ -162,6 +169,31 @@ const commands = {
     const file = findRoles(f.roles === true ? undefined : f.roles), roles = JSON.parse(fs.readFileSync(file, 'utf8')).roles;
     console.log(`Cast from ${file}\n`);
     for (const [id, r] of Object.entries(roles)) console.log(`  ${(r.name + ', ' + (r.title || '')).padEnd(38)} ${id.padEnd(24)} home: ${r.home || '-'}`);
+  },
+  async update({ f }) {
+    const slug = upd.repoSlug(); if (!slug) die('this copy does not know its GitHub repository (package.json "repository")');
+    const state = upd.readState(), kind = upd.installKind();
+    process.stdout.write(`${bold('agent-realm')} v${pkg.version}  ${dim('checking github.com/' + slug + ' ...')}\n`);
+    let l; try { l = await upd.latest(slug); } catch (e) { die(`could not check for updates: ${e.message}`); }
+    const known = state.sha, same = known === l.sha;
+    console.log(`  latest   ${l.short}${l.version ? ' (v' + l.version + ')' : ''}  ${dim(l.message)}`);
+    console.log(`  yours    ${known ? known.slice(0, 7) : dim('unknown (installed before update tracking)')}  v${pkg.version}`);
+    if (f.check) { console.log(same ? green('\nUp to date.') : '\n' + (known ? yellow('A newer version is available.') : yellow('Cannot tell if you are current.')) + ' Run: agent-realm update'); process.exitCode = same ? 0 : 2; return; }
+    if (same && !f.force) { console.log(green('\nAlready up to date.')); return; }
+    if (kind === 'clone') { console.log(yellow(`\nThis copy runs from a git clone (${ROOT}).\nUpdate it with:  git -C "${ROOT}" pull   ${dim('(then npm install -g . if you installed it globally)')}`)); return; }
+    if (kind === 'npx') { console.log(yellow('\nThis copy runs from a temporary npx cache; npx fetches the latest on each run. For a permanent install:\n  npm install -g github:' + slug)); return; }
+    console.log(`\n${bold('Updating')} ${dim('npm install -g github:' + slug)}\n`);
+    const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const r = cp.spawnSync(npm, ['install', '-g', `github:${slug}`], { stdio: 'inherit' });
+    if (r.status !== 0) { console.error(red('\nUpdate failed.') + ' If you saw a permissions error, fix your npm prefix or run with the permissions you used to install.'); process.exit(1); }
+    upd.writeState({ sha: l.sha, version: l.version, updatedAt: new Date().toISOString() });
+    console.log(green(`\n✔ Updated to ${l.short}${l.version ? ' (v' + l.version + ')' : ''}.`));
+    const hooked = agents.IDS.filter(i => agents.status(i).hooks.user > 0);
+    if (f.hooks && hooked.length) {
+      console.log(`\nRefreshing hooks for ${hooked.map(i => agents.AGENTS[i].label).join(', ')} ...`);
+      cp.spawnSync(process.execPath, [path.join(ROOT, 'bin', 'agent-realm.js'), 'hooks', 'install', '--agent', hooked.join(','), '--yes'], { stdio: 'inherit' });   // same path, now the new code
+    } else if (hooked.length) console.log(dim('  Hooks call "agent-realm hook", so they already use the new version. To pick up any new hook events, run: agent-realm update --hooks'));
+    console.log(dim('  Restart a running show (Ctrl+C, then agent-realm) to load the new version.'));
   },
   async hook() { require('../hook.js'); },
   async init({ f }) { await setup(f, { docs: true }); },
