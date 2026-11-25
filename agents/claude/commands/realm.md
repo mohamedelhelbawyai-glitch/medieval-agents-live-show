@@ -12,4 +12,4 @@ Manage the Agent Realm live show for this session. The requested action is: `$AR
 - `cast`: run `agent-realm roles` and show the cast.
 - `demo`: run `agent-realm start --open --demo` in the background to show the simulated cast.
 
-If the `agent-realm` command is not found, tell the user to install it (`npm install -g .` from the agent-realm project folder) and run `agent-realm init`. Keep the reply to two sentences and include the URL.
+If the `agent-realm` command is not found, tell the user to install it (see the README) and run `agent-realm init`. Keep the reply to two sentences and include the URL.

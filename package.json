@@ -1,6 +1,6 @@
 {
   "name": "agent-realm",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A live pixel-art medieval town where your working AI agents appear as knights, merchants, farmers and more.",
   "bin": {
     "agent-realm": "bin/agent-realm.js"
@@ -8,14 +8,17 @@
   "main": "server.js",
   "files": [
     "bin",
-    "claude",
+    "lib",
+    "agents",
     "public",
     "server.js",
     "hook.js",
+    "roles.json",
     "README.md"
   ],
   "scripts": {
-    "start": "node bin/agent-realm.js start"
+    "start": "node bin/agent-realm.js",
+    "test": "node --test test/"
   },
   "engines": {
     "node": ">=18"

@@ -1,90 +1,91 @@
 # Agent Realm
 
-A live, pixel-art medieval town where your working AI agents show up as characters
-(governor, knights, merchants, traders, workers, farmers, scribes, bards) and walk to
-the building that matches what they are doing. Think "AgentsTV", but in a castle town.
+**Watch your AI agents work, as a medieval town.**
 
-No dependencies. Needs Node.js 18 or newer.
+Every agent role is a named pixel character. The tool it is using decides where it walks: readers go to the
+library, coders to the forge, shell commands to the barracks, test runs to the arena, and when an agent
+finishes, it presents its report on the theatre stage. Works with **Claude Code, Codex, Qwen Code and Cursor**.
 
-## 1. Install the CLI (from GitHub, on any machine)
+```
+        library ─── castle ─── barracks ─── ARENA   ← test runs are tournaments
+           │          │           │           │
+         forge ─── market ─── tavern ─── THEATRE   ← finished reports are shows
+           │                      │
+         farm ────── river ─── docks              ← MCP and deploys arrive by boat
+```
+
+## Two commands
 
 ```bash
 npm install -g github:mohamedelhelbawyai-glitch/medieval-agents-live-show
-agent-realm --version
+agent-realm hooks install
 ```
 
-To update, run the same command again. To try it without installing:
-`npx github:mohamedelhelbawyai-glitch/medieval-agents-live-show start --open`.
+Then run `agent-realm` to open the town, and use your agent in another terminal as usual.
 
-Hacking on a local clone instead? Run `npm install -g .` (or `npm link`) inside it.
+`hooks install` finds the agents on your machine, shows you exactly which files it will change, and asks first.
+Nothing else is needed: no accounts, no network, no config.
 
-## 2. Start the live show
+```
+$ agent-realm hooks install
 
-```bash
-agent-realm start --open        # open the town in your browser
-agent-realm start --demo --open # same, with a simulated cast of agents
+Agents on this machine
+  ✔ Claude Code  /opt/homebrew/bin/claude
+  ✔ Codex        /opt/homebrew/bin/codex
+  – Qwen Code    not found
+  ✔ Cursor       ~/.cursor
+
+Install Agent Realm for Claude Code, Codex, Cursor  (user scope)
+  Claude Code  hooks → ~/.claude/settings.json
+  Codex        hooks → ~/.codex/hooks.json
+  Cursor       hooks → ~/.cursor/hooks.json
+
+Install these changes? (files are backed up as *.bak) [Y/n]
 ```
 
-It listens on `http://localhost:4747` (change with `--port`). Other commands:
+## Works with
 
-| Command | What it does |
-|---|---|
-| `agent-realm start [--port] [--open] [--demo]` | Run the live show |
-| `agent-realm status` | Is it running, and how many viewers are watching |
-| `agent-realm emit --agent a1 --tool Bash --status start --text "npm test"` | Send a test event |
-| `agent-realm init [--scope project\|user] [--dry-run]` | Connect Claude Code (see below) |
-| `agent-realm install-hooks` | Only add the hooks |
-| `agent-realm uninstall-hooks [--all]` | Remove hooks (`--all` also removes `/realm` and the CLAUDE.md block) |
+| Agent | How it connects | Config it writes | Good to know |
+|---|---|---|---|
+| **Claude Code** | Hooks: `PreToolUse`, `PostToolUse`, `Notification`, `SubagentStop`, `Stop` | `~/.claude/settings.json` | Subagents launched by name (`code-reviewer`...) appear as their own characters |
+| **Codex** | Hooks: `PreToolUse`, `PostToolUse`, `SubagentStart`, `SubagentStop`, `Stop` | `~/.codex/hooks.json` | Open `/hooks` once and **trust** the Agent Realm entries |
+| **Qwen Code** | Hooks: the same set plus `PostToolUseFailure` and `Notification` | `~/.qwen/settings.json` | User hooks load automatically; project hooks ask for approval |
+| **Cursor** | Hooks: `preToolUse`, `postToolUse`, `postToolUseFailure`, `subagentStart`, `subagentStop`, `stop` | `~/.cursor/hooks.json` | Observe-only: always answers "allow", never changes what the agent does |
 
-## Zoom and pan
+Anything else that can send an HTTP request works too, see [Event format](#event-format).
 
-The town is a square, so on most screens it is limited by window height. Use the **+ / − / FIT** buttons (bottom right of
-the map), **Ctrl or ⌘ + scroll** to zoom toward the pointer, and drag to pan once zoomed in. Characters are drawn at
-1.6x their sprite size (`SPR` at the top of `public/game.js`).
+## Install
 
-## The side panel
+| How | Command | Notes |
+|---|---|---|
+| Global CLI (recommended) | `npm install -g github:mohamedelhelbawyai-glitch/medieval-agents-live-show` | Hooks call `agent-realm`, so they work in every project and survive reboots. Run the same command to update. |
+| Try without installing | `npx github:mohamedelhelbawyai-glitch/medieval-agents-live-show --demo` | Starts the show with a simulated cast. Don't run `hooks install` this way: `npx` caches are temporary. |
+| From a clone | `git clone … && cd … && npm install -g .` | For hacking on it. `npm test` runs the adapter tests. |
 
-The sidebar is a menu. Pick a button to see that view in place of the menu, and use **MENU** to go back:
+Requires Node 18 or newer. There are no runtime dependencies.
 
-- **Logs**: every event, newest at the bottom.
-- **Tasks**: the tasks running right now, with who is doing them, where, and for how long.
-- **Agents**: every character in the town with a live status (working, traveling, resting, on duty, reporting, failed).
+If the `agent-realm` on your PATH is older than the one doing the install, the installer says so and points
+the hooks at the new copy instead, so an old global install can never break a newer hook.
 
-## 3. Connect Claude Code
+## How it works
 
-Run this once in the project you want to watch:
+1. **Hooks.** Each agent runs `agent-realm hook <agent>` around its tool calls. It reads the agent's own payload from stdin.
+2. **Adapters.** One small adapter per agent turns Claude, Codex, Qwen and Cursor payloads into the same tiny event: who, which tool, a short detail, started/done/failed.
+3. **Server.** A local Node server on `127.0.0.1:4747` relays events to the browser over a live stream.
+4. **Town.** The browser draws the town. Tools map to places, roles map to characters, and your agent's work becomes walking, building, fighting and performing.
 
-```bash
-agent-realm init
-```
+Hooks never block your agent: they exit 0 within a second even when the show isn't running.
 
-It sets up three things (re-running is safe, and your own hooks and settings are kept):
-
-1. **Hooks** in `.claude/settings.json` for `PreToolUse`, `PostToolUse`, `Notification`, `SubagentStop` and `Stop`. Each tool call becomes an event.
-2. **`/realm` slash command** in `.claude/commands/realm.md` to start, check or open the show from inside Claude Code.
-3. **A short block in `CLAUDE.md`** (between `agent-realm:start` / `agent-realm:end` markers) so Claude knows about the show.
-
-The hooks run `agent-realm hook`, so they work wherever the CLI is installed and contain no machine-specific paths. Environment overrides for the hooks: `REALM_ROLE` (act as that role), `REALM_NAME`, `REALM_URL`, `REALM_DEBUG`. Use `--scope user` to install for every project (writes to `~/.claude`). Preview with `--dry-run`.
-Restart Claude Code afterwards, or check `/hooks`, so the hooks load.
-
-Then open the town and use Claude Code as usual:
-
-```bash
-agent-realm start --open
-```
-
-The Claude Code files live in [`claude/`](claude/) if you'd rather copy them by hand:
-`claude/settings.example.json` (hooks), `claude/commands/realm.md` (slash command), `claude/CLAUDE.md` (memory block).
+## The town
 
 ### The cast (roles, not tasks)
 
-Every character is an **agent role**, not a task. A role keeps its identity and moves around the town as its
-work changes. The cast lives in [`roles.json`](roles.json), one entry per agent name (the `subagent_type` Claude
-Code launches). The default cast matches an orchestrated, phase-based agent system:
+A character is an **agent role**. It keeps its identity while its work changes. The default cast in
+[`roles.json`](roles.json) matches an orchestrated, phase-based system:
 
 | Role | Character | Look |
 |---|---|---|
-| orchestrator (main session) | Lord Aldric, Conductor | Governor |
+| orchestrator (the main session) | Lord Aldric, Conductor | Governor |
 | intake-auditor | Brother Osric, Herald of Intake | Herald |
 | spec-author | Maud, Scribe of Specs | Scribe |
 | spec-reviewer / plan-reviewer / coverage-reviewer | Magistrates Hartwin, Ysolde, Wulfric | Judge |
@@ -99,58 +100,136 @@ Code launches). The default cast matches an orchestrated, phase-based agent syst
 | performance-engineer | Alchemist Thorne | Alchemist |
 | final-auditor | High Justice Eadric | Judge in purple |
 
-Edit or add roles with your own file: `agent-realm roles --init` writes `agent-realm.roles.json` into the current
-folder (picked up automatically), or pass `agent-realm start --roles my-roles.json`. Each role has `name`, `title`,
-`look`, optional `body`/`accent` colours, a `home` place, and a list of `tasks` (shown in the sidebar's cast panel).
-`agent-realm roles` lists the cast in use. Agents with an unknown role still appear, as a generic villager.
+Agents with a role that isn't in the file still appear, as a villager. Make your own cast:
+`agent-realm roles --init` writes `agent-realm.roles.json` here (picked up automatically), or use
+`agent-realm start --roles my-roles.json`. Each role has `name`, `title`, `look`, optional `body` / `accent`
+colours, a `home` place and a list of `tasks`. `agent-realm roles` lists the cast in use.
 
 ### Where they stand
 
-The map is a pixel-art walled town ([`public/assets/town.jpg`](public/assets/town.jpg)). The **tool** an agent is using
-decides the place; the role decides who it is.
+The **tool** decides the place. Tool names from every agent are normalised (`run_shell_command`, `Shell`, `exec_command`
+and `Bash` are all the same to the town).
 
-| Place | On the map | Tools | Nature of work |
-|---|---|---|---|
-| Town Hall | clock-tower hall | Task, TodoWrite, plans | Delegation and planning |
-| Library | wizard tower | Read, Grep, Glob | Reading, research, reviewing |
-| Forge | open smithy | Edit, Write, build commands | Writing code |
-| Barracks | the barn by the south road | other shell commands | Running things |
-| Market | the stalls | WebSearch, WebFetch | Looking things up outside |
-| East Gate | east bridge | `mcp__*` tools, deploy commands | External services |
-| Farm | the crop fields | database, memory tools | Data |
-| **Arena** | west fountain square | test commands (`npm test`, `flutter test`, `pytest`...) | **Tests are fights**: dummies and banners appear while a tournament is on |
-| **Theatre** | east fountain square | a Stop / subagent finishing | **Reports are shows**: a stage appears while someone presents |
-| Inn, chapel, arena stands, theatre seats | tavern, church, the squares | idle | Breaks: idle agents drink, pray, watch a fight, or watch a show |
+| Place | Tools | Nature of work |
+|---|---|---|
+| Castle | Task, TodoWrite, plans, subagents | Delegation and planning |
+| Library | Read, Grep, Glob | Reading, research, reviewing |
+| Forge | Edit, Write, `apply_patch`, build commands | Writing code |
+| Barracks | other shell commands | Running things |
+| Market | WebSearch, WebFetch | Looking things up outside |
+| Docks | `mcp__*` tools, deploy commands | External services |
+| Farm | database, memory tools | Data |
+| **Arena** | test commands (`npm test`, `flutter test`, `pytest`...) | **Tests are fights.** Idle agents come to watch |
+| **Theatre** | a Stop or subagent finishing | **Reports are shows.** Idle agents come to watch |
+| Tavern, stands, seats | idle | Breaks |
 
-When a role has no tool activity of its own (for example while a subagent is running), it stands at its `home` place
-from `roles.json`. Agents start at the south gate and walk the town's roads.
+Failed tool calls (Qwen Code and Cursor report them) show a red FAILED bubble. When a role has no tool activity of its own
+(for example while a subagent runs), it stands at its `home` place.
 
-**Using a different map:** replace `public/assets/town.jpg` and edit the `ROADS` and `LOC` tables near the top of
-`public/game.js` (coordinates are pixels of the source image). Open the page with `?debug` to draw the walking graph
-(red) and every standing slot (cyan) over the map while you calibrate.
+### The screen
 
-### How subagents are detected
+The side panel is a menu: **Logs** (every event), **Tasks** (what is running right now and for how long), **Agents**
+(everyone in town with a live status). Zoom with the **+ / − / FIT** buttons or **Ctrl/⌘ + scroll**, and drag to pan.
+`?demo` in the URL starts a simulated cast. An earlier pixel-art town map is kept under the git tag `pixel-town-map`.
 
-- When the orchestrator calls the `Task` tool, the hook reads `subagent_type`, so the matching character appears
-  and stays "on duty" until the subagent returns, then presents its report on the theatre stage.
-- If Claude Code includes `agent_type` in a hook payload, that subagent's own tool calls are attributed to it.
-  Otherwise they are shown as the orchestrator's. To see which fields your Claude Code version sends, run with
-  `REALM_DEBUG=/tmp/realm-hooks.log` and inspect the file.
+## Commands
 
-## Event format (any agent, not just Claude Code)
+| Command | What it does |
+|---|---|
+| `agent-realm` | Start the show and open it in your browser |
+| `agent-realm start [--port 4747] [--no-open] [--demo] [--roles file]` | Same, with options |
+| `agent-realm hooks install` | Connect your agents (hooks only) |
+| `agent-realm init` | Hooks **plus** short instruction files, so agents know about the show (below) |
+| `agent-realm hooks status` | Which agents are found and connected, and whether the show is running |
+| `agent-realm hooks uninstall [--all]` | Remove hooks; `--all` also removes the instruction files |
+| `agent-realm roles [--init]` | List the cast, or write an editable copy here |
+| `agent-realm emit --agent a1 --tool Bash --status start --text "npm test"` | Send a test event |
+| `agent-realm status` | Is the show running? |
+
+Setup options (for `init` and `hooks install` / `uninstall`):
+
+| Option | Meaning |
+|---|---|
+| `--agent claude,codex,qwen,cursor` or `all` | Which agents. Default: every agent found on this machine |
+| `--scope user` or `project` | `user` (default) covers all your projects; `project` writes into the current folder only |
+| `--dry-run` | Show what would change, write nothing |
+| `--yes` | Don't ask for confirmation (needed in scripts) |
+
+### What `init` adds beyond hooks
+
+| Agent | Instruction file | Extra |
+|---|---|---|
+| Claude Code | a block in `CLAUDE.md` | a `/realm [start\|status\|open\|demo\|cast]` slash command |
+| Codex | a block in `AGENTS.md` | |
+| Qwen Code | a block in `QWEN.md` | |
+| Cursor | `.cursor/rules/agent-realm.mdc` (project scope) | |
+
+The blocks are fenced with `<!-- agent-realm:start -->` markers and are replaced, never duplicated. The text each agent gets lives
+in [`agents/`](agents/): `block.md` (the instructions) and a ready-to-copy `settings.example.json` / `hooks.example.json` if you'd
+rather edit the config by hand.
+
+## Privacy
+
+Agent Realm runs on your machine and talks only to `127.0.0.1`.
+
+- **What an event carries:** the agent's session id (shortened), the tool name, and a short detail for the speech bubble:
+  the first 100 characters of a command, a file's *name* (not its path or contents), a search query or URL, a subagent's one-line description, or the text of a notification ("needs your input"). It also carries the project folder's name, for the nameplate.
+- **What it never carries:** file contents, prompts, model replies, transcripts, or environment variables. A unit test plants a secret in
+  the file-content and prompt fields and checks it never appears in an event.
+- **Stricter:** set `REALM_REDACT=1` in your environment and events carry tool names only. No commands, file names or queries.
+- **Local only:** the server binds to `127.0.0.1`, and `POST /event` requires a JSON content type so other websites can't inject events.
+- **Non-destructive setup:** your other settings are kept, the original file is backed up, and uninstall puts the original back
+  byte for byte (tested), including removing files and folders the installer created.
+
+## Event format
+
+Any agent, script or CI job can drive the town:
 
 ```bash
 curl -X POST localhost:4747/event -H 'Content-Type: application/json' \
   -d '{"agent":"a1","tool":"Bash","status":"start","text":"npm test"}'
 ```
 
-Fields: `agent` (id, required), `status` (`start` | `done` | `error` | `idle`), `tool`, `text`, and optional
-`role` (a key from roles.json), `name`, `project`, `location` (castle, library, forge, barracks, market, docks, farm,
-tavern, chapel, arena, theatre), `activity: "report"` (present on the theatre stage) and `hold: true` (stay on duty until a
-later event for the same agent).
+Fields: `agent` (id, required), `status` (`start` | `done` | `error` | `idle`), `tool`, `text`, and optional `role` (a key from
+roles.json), `name`, `project`, `location` (castle, library, forge, barracks, market, docks, farm, tavern, arena, theatre),
+`activity: "report"` (present on the theatre stage) and `hold: true` (stay on duty until a later event for the same agent).
 
-## Notes
+## Troubleshooting
 
-- The server only listens on `127.0.0.1`, and `POST /event` requires a JSON content type so other websites can't inject events.
-- Hooks never block Claude Code: they time out in under a second and always exit 0, so a stopped show is harmless.
-- Remove everything with `agent-realm uninstall-hooks --all`.
+| Symptom | Try |
+|---|---|
+| Nothing appears | `agent-realm hooks status`: is the show running and the agent connected? Restart the agent so it loads hooks. |
+| Codex shows nothing | Open `/hooks` in Codex and trust the Agent Realm entries. Hosted web search doesn't fire Codex hooks. |
+| Qwen Code project hooks don't run | Approve them at startup, or install at user scope (the default). |
+| "PATH has an older version" | `npm install -g github:mohamedelhelbawyai-glitch/medieval-agents-live-show`, then re-run `hooks install`. |
+| A tool shows up in the wrong place | See what your agent really sends: `REALM_DEBUG=/tmp/realm-hooks.log`, then read the file. |
+| Remove everything | `agent-realm hooks uninstall --all --scope user` (and `--scope project` per project) |
+
+## Status
+
+What is verified and what isn't, plainly:
+
+- **Tested here:** all four adapters against payloads built from each agent's published hook documentation (`npm test`); the installer and
+  uninstaller in a sandbox home directory with pre-existing settings (idempotent, user data kept, byte-identical after uninstall); the actual
+  command strings written into each config, piped realistic payloads, and received by the show; Cursor's required `allow` reply.
+- **Not yet verified in a live session:** Codex, Qwen Code and Cursor running real agent work against it. Their payload fields come from
+  documentation, and a few details are documented loosely (for example Cursor's file-edit payload). If a tool lands in the wrong place, the
+  `REALM_DEBUG` log shows what your version sends, and `lib/adapters.js` is the one file to adjust.
+- **Subagent attribution:** Claude Code subagents appear when the orchestrator launches them by name. Tool calls made *inside* a subagent are
+  attributed to it only if your agent version includes the subagent's identity in the hook payload (Qwen Code does, as `agent_id`).
+
+## Layout
+
+```
+bin/agent-realm.js   the CLI
+lib/adapters.js      one payload adapter per agent (pure functions, unit-tested)
+lib/agents.js        detect, install and uninstall per agent
+hook.js              the hook entry point the agents call
+server.js            local server (events in, live stream out)
+roles.json           the default cast
+agents/<agent>/      instruction block + example config for each agent
+public/              the town (canvas renderer, side panel, demo simulator)
+test/                adapter tests
+```
+
+MIT.

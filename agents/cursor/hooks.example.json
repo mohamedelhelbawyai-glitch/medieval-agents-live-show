@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse":         [{ "command": "agent-realm hook cursor", "timeout": 5 }],
+    "postToolUse":        [{ "command": "agent-realm hook cursor", "timeout": 5 }],
+    "postToolUseFailure": [{ "command": "agent-realm hook cursor", "timeout": 5 }],
+    "subagentStart":      [{ "command": "agent-realm hook cursor", "timeout": 5 }],
+    "subagentStop":       [{ "command": "agent-realm hook cursor", "timeout": 5 }],
+    "stop":               [{ "command": "agent-realm hook cursor", "timeout": 5 }]
+  }
+}
