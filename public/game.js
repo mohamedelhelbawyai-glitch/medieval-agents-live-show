@@ -1,7 +1,8 @@
 'use strict';
 // Agent Realm: pixel medieval town renderer. The map is a pixel-art image; characters and effects are drawn on top.
 (() => {
-const SC = 0.6, CW = 900, CH = 900;   // the 1500px source image is drawn at 0.6 scale
+const SC = 0.6, CW = 900, CH = 900;
+const SPR = 1.6;   // characters are drawn this much larger than their 20x24 sprite   // the 1500px source image is drawn at 0.6 scale
 const $ = s => document.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -266,8 +267,7 @@ function drawAgent(a) {
   else if (a.cheer) bob = Math.floor(a.anim * 4) % 2 ? -2 : 0;
   else bob = Math.sin(a.anim * 2) > .6 ? -1 : 0;
   const spr = getSprite(a, frame), x = Math.round(a.x), y = Math.round(a.y + bob);
-  ctx.save(); ctx.translate(x, y - 21);
-  if (a.facing < 0) ctx.scale(-1, 1);
+  ctx.save(); ctx.translate(x, y - 21 * SPR); ctx.scale(a.facing < 0 ? -SPR : SPR, SPR);
   ctx.drawImage(spr, -10, 0); ctx.restore();
 }
 
@@ -417,11 +417,31 @@ function refreshUi(force) {
 document.querySelectorAll('#menu button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
 $('#back').addEventListener('click', () => showView(null));
 
-function fit() {
-  const wrap = $('#wrap'), box = $('#box'), pad = 24;
-  const s = Math.min((wrap.clientWidth - pad) / CW, (wrap.clientHeight - pad) / CH);
+let zoom = 1;
+function fit(keepPoint) {
+  const wrap = $('#wrap'), box = $('#box'), pad = 16;
+  const base = Math.min((wrap.clientWidth - pad) / CW, (wrap.clientHeight - pad) / CH), s = base * zoom;
   box.style.width = Math.floor(CW * s) + 'px'; box.style.height = Math.floor(CH * s) + 'px'; box.style.setProperty('--u', s.toFixed(3));
   cv.style.imageRendering = s >= 1 ? 'pixelated' : 'auto';   // sharp pixels when enlarged, smooth when shrunk
+  wrap.classList.toggle('pan', zoom > 1.01);
+}
+function setZoom(z, cx, cy) {   // zoom around a point (client coords), default the middle of the view
+  const wrap = $('#wrap'), box = $('#box'), r = box.getBoundingClientRect(), w = wrap.getBoundingClientRect();
+  cx = cx === undefined ? w.left + w.width / 2 : cx; cy = cy === undefined ? w.top + w.height / 2 : cy;
+  const fx = (cx - r.left) / r.width, fy = (cy - r.top) / r.height;
+  zoom = clamp(z, 1, 4); fit();
+  const n = box.getBoundingClientRect();
+  wrap.scrollLeft += n.left + fx * n.width - cx; wrap.scrollTop += n.top + fy * n.height - cy;
+}
+{
+  const wrap = $('#wrap'); let drag = null;
+  $('#zIn').addEventListener('click', () => setZoom(zoom * 1.35));
+  $('#zOut').addEventListener('click', () => setZoom(zoom / 1.35));
+  $('#zFit').addEventListener('click', () => { setZoom(1); wrap.scrollLeft = wrap.scrollTop = 0; });
+  wrap.addEventListener('wheel', e => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); setZoom(zoom * Math.exp(-e.deltaY * 0.01), e.clientX, e.clientY); } }, { passive: false });
+  wrap.addEventListener('mousedown', e => { if (zoom > 1.01 && e.button === 0) { drag = { x: e.clientX, y: e.clientY, l: wrap.scrollLeft, t: wrap.scrollTop }; wrap.classList.add('dragging'); } });
+  addEventListener('mousemove', e => { if (drag) { wrap.scrollLeft = drag.l - (e.clientX - drag.x); wrap.scrollTop = drag.t - (e.clientY - drag.y); } });
+  addEventListener('mouseup', () => { drag = null; wrap.classList.remove('dragging'); });
 }
 addEventListener('resize', fit);
 

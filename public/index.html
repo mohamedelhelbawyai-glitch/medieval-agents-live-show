@@ -10,13 +10,16 @@
 </head>
 <body>
 <div id="app">
-  <main id="wrap">
-    <div id="box">
-      <canvas id="stage"></canvas>
-      <div id="overlay"></div>
-      <div id="hud"><span id="clock">DAY 1 09:00</span></div>
-      <div id="empty">NO AGENTS IN THE REALM YET<small>Send events to /event or press DEMO</small></div>
+  <main id="pane">
+    <div id="wrap">
+      <div id="box">
+        <canvas id="stage"></canvas>
+        <div id="overlay"></div>
+        <div id="hud"><span id="clock">DAY 1 09:00</span></div>
+        <div id="empty">NO AGENTS IN THE REALM YET<small>Send events to /event or press DEMO</small></div>
+      </div>
     </div>
+    <div id="zoom"><button id="zIn" title="Zoom in">+</button><button id="zOut" title="Zoom out">&minus;</button><button id="zFit" title="Fit the whole town">FIT</button></div>
   </main>
   <aside id="side">
     <header>

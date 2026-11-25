@@ -36,6 +36,12 @@ It listens on `http://localhost:4747` (change with `--port`). Other commands:
 | `agent-realm install-hooks` | Only add the hooks |
 | `agent-realm uninstall-hooks [--all]` | Remove hooks (`--all` also removes `/realm` and the CLAUDE.md block) |
 
+## Zoom and pan
+
+The town is a square, so on most screens it is limited by window height. Use the **+ / − / FIT** buttons (bottom right of
+the map), **Ctrl or ⌘ + scroll** to zoom toward the pointer, and drag to pan once zoomed in. Characters are drawn at
+1.6x their sprite size (`SPR` at the top of `public/game.js`).
+
 ## The side panel
 
 The sidebar is a menu. Pick a button to see that view in place of the menu, and use **MENU** to go back:
