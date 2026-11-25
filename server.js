@@ -3,12 +3,24 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const PUB = path.join(__dirname, 'public');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 
-function start({ port = 4747, host = '127.0.0.1', quiet = false } = {}) {
+// roles.json lookup order: --roles, REALM_ROLES, ./agent-realm.roles.json, bundled roles.json
+function findRoles(opt) {
+  const ok = f => { try { JSON.parse(fs.readFileSync(f, 'utf8')); return true; } catch { return false; } };
+  return [opt, process.env.REALM_ROLES, path.join(process.cwd(), 'agent-realm.roles.json'), path.join(__dirname, 'roles.json')]
+    .filter(Boolean).map(f => path.resolve(f)).find(ok);
+}
+
+function start({ port = 4747, host = '127.0.0.1', quiet = false, roles } = {}) {
   const clients = new Set();
+  const rolesFile = findRoles(roles);
   const server = http.createServer((req, res) => {
     const url = req.url.split('?')[0];
     if (req.method === 'GET' && url === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ok: true, name: 'agent-realm', viewers: clients.size }));
+      return;
+    }
+    if (req.method === 'GET' && url === '/roles.json') {
+      fs.readFile(rolesFile, (err, data) => { if (err) { res.writeHead(404).end(); return; } res.writeHead(200, { 'Content-Type': 'application/json' }).end(data); });
       return;
     }
     if (req.method === 'GET' && url === '/events') {
@@ -46,10 +58,11 @@ function start({ port = 4747, host = '127.0.0.1', quiet = false } = {}) {
     server.once('error', reject);
     server.listen(port, host, () => {
       if (!quiet) console.log(`Agent Realm running at http://localhost:${port}`);
+      server.rolesFile = rolesFile;
       resolve(server);
     });
   });
 }
 
-module.exports = { start };
+module.exports = { start, findRoles };
 if (require.main === module) start({ port: +process.env.PORT || 4747 });

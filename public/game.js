@@ -1,7 +1,7 @@
 'use strict';
 // Agent Realm — pixel medieval town renderer. Everything is drawn procedurally (no image assets).
 (() => {
-const T = 16, W = 40, H = 24, CW = W * T, CH = H * T;
+const T = 16, W = 52, H = 24, CW = W * T, CH = H * T;
 const $ = s => document.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -9,48 +9,69 @@ function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = 
 function hash(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
 const R = (g, x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
 
-/* ---------------------------------------------------------------- roles */
-const ROLES = {
-  governor: { label: 'Governor', body: '#a8232f', legs: '#3b2a4a', belt: '#ffd23f', color: '#ff6b7a' },
-  knight:   { label: 'Knight',   body: '#8a94a8', legs: '#555d6e', belt: '#3a3f4b', color: '#8fbcff' },
-  merchant: { label: 'Merchant', body: '#7b3a96', legs: '#3d2a4f', belt: '#d9a521', color: '#d78bff' },
-  trader:   { label: 'Trader',   body: '#2f7a5a', legs: '#3a3326', belt: '#6b4a2a', color: '#5fe0a0', hat: '#1f5a40' },
-  worker:   { label: 'Worker',   body: '#b07a3c', legs: '#5a4630', belt: '#4a3520', color: '#ffb050', hat: '#6b4a2a' },
-  farmer:   { label: 'Farmer',   body: '#e6dcae', legs: '#4a6fa5', belt: '#8a6a3a', color: '#c8e65a' },
-  scribe:   { label: 'Scribe',   body: '#3a5cc0', legs: '#2a3a6a', belt: '#d9c27a', color: '#7fd0ff' },
-  bard:     { label: 'Bard',     body: '#c8553a', legs: '#3a2a2a', belt: '#e8c15a', color: '#ff9ec0' },
+/* ---------------------------------------------------------------- looks & roles */
+// A "look" is a sprite family. roles.json maps each agent role to a look (+ recolour), a name and a title.
+const LOOKS = {
+  governor:     { body: '#a8232f', legs: '#3b2a4a', belt: '#ffd23f', color: '#ff6b7a' },
+  knight:       { body: '#8a94a8', legs: '#555d6e', belt: '#3a3f4b', color: '#8fbcff' },
+  merchant:     { body: '#7b3a96', legs: '#3d2a4f', belt: '#d9a521', color: '#d78bff' },
+  trader:       { body: '#2f7a5a', legs: '#3a3326', belt: '#6b4a2a', color: '#5fe0a0', hat: '#1f5a40' },
+  worker:       { body: '#b07a3c', legs: '#5a4630', belt: '#4a3520', color: '#ffb050', hat: '#6b4a2a' },
+  farmer:       { body: '#e6dcae', legs: '#4a6fa5', belt: '#8a6a3a', color: '#c8e65a' },
+  scribe:       { body: '#3a5cc0', legs: '#2a3a6a', belt: '#d9c27a', color: '#7fd0ff' },
+  bard:         { body: '#c8553a', legs: '#3a2a2a', belt: '#e8c15a', color: '#ff9ec0' },
+  herald:       { body: '#2b5ea8', legs: '#3a3a4a', belt: '#d9a521', color: '#7fb6ff' },
+  judge:        { body: '#26263a', legs: '#1a1a28', belt: '#ffd23f', color: '#c9a6ff' },
+  architect:    { body: '#c9a46a', legs: '#5a4630', belt: '#6b4a2a', color: '#ffd89a' },
+  steward:      { body: '#5c7a52', legs: '#3a4a34', belt: '#d9a521', color: '#9fe08a' },
+  archivist:    { body: '#6a4a8a', legs: '#3a2a4a', belt: '#d9c27a', color: '#d6a8ff' },
+  inquisitor:   { body: '#2e2e3c', legs: '#1c1c26', belt: '#8a5a2b', color: '#ffcf70' },
+  jester:       { body: '#c0394b', legs: '#2f5fb8', belt: '#ffd23f', color: '#ff8fa0' },
+  plaguedoctor: { body: '#2a2a2e', legs: '#1e1e22', belt: '#8a5a2b', color: '#9ad0b0' },
+  alchemist:    { body: '#2f7a86', legs: '#2a4a52', belt: '#8a5a2b', color: '#7fe0d0' },
 };
-const LOC_ROLE = { castle: 'governor', library: 'scribe', forge: 'worker', barracks: 'knight', market: 'merchant', docks: 'trader', farm: 'farmer', tavern: 'bard' };
+const LOC_LOOK = { castle: 'governor', library: 'scribe', forge: 'worker', barracks: 'knight', market: 'merchant', docks: 'trader', farm: 'farmer', tavern: 'bard', arena: 'knight', stands: 'bard', theatre: 'bard', audience: 'bard' };
 const FIRST = ['Aldric','Brenna','Cedric','Dagny','Edmund','Freya','Gareth','Hild','Ivo','Jorah','Kenna','Leofric','Mira','Nedd','Osric','Petra','Rolf','Sybil','Tobias','Ulric','Wulf','Yara','Edda','Bran'];
-const roleName = (id, role) => { const f = FIRST[hash(id) % FIRST.length]; return role === 'governor' ? 'Lord ' + f : role === 'knight' ? 'Sir ' + f : f; };
+const fallbackName = (id, look) => { const f = FIRST[hash(id) % FIRST.length]; return look === 'governor' ? 'Lord ' + f : look === 'knight' ? 'Sir ' + f : f; };
+let ROLEDEF = {};   // role id -> {name,title,look,body,accent,home,tasks}
 
 /* ---------------------------------------------------------------- map data */
-const ROADS = [
+const ROADS = [   // drawn as dirt roads and walkable
   [[20,23],[20,16],[20,12],[20,9]],
-  [[6,9],[20,9],[34,9]],
-  [[6,16],[8,16],[20,16],[30,16],[34,16]],
+  [[6,9],[20,9],[34,9],[40,9],[46,9]],
+  [[6,16],[8,16],[20,16],[30,16],[34,16],[40,16],[46,16]],
+  [[40,9],[40,16]],
   [[8,16],[8,18]],
   [[30,16],[30,17]],
 ];
+const PATHS = [   // walkable but not drawn (gate and aisle)
+  [[46,9],[46,7],[46,5]],
+  [[46,16],[46,14],[46,12]],
+];
 const LOC = {
-  castle:   { name: 'CASTLE',   node: '20,9',  slots: [[18,8],[19,8],[21,8],[22,8],[20,8]] },
-  library:  { name: 'LIBRARY',  node: '6,9',   slots: [[4,8],[5,8],[7,8],[8,8]] },
-  barracks: { name: 'BARRACKS', node: '34,9',  slots: [[32,8],[33,8],[35,8],[36,8]] },
-  forge:    { name: 'FORGE',    node: '6,16',  slots: [[4,15],[5,15],[7,15],[8,15]] },
-  tavern:   { name: 'TAVERN',   node: '34,16', slots: [[32,15],[33,15],[35,15],[36,15]] },
-  market:   { name: 'MARKET',   node: '20,12', slots: [[18,11],[19,13],[21,11],[22,13],[18,13],[22,11]] },
-  farm:     { name: 'FARM',     node: '8,18',  slots: [[4,19],[6,20],[10,19],[12,20],[5,21],[11,21]] },
-  docks:    { name: 'DOCKS',    node: '30,17', slots: [[30,19],[31,20],[30,21],[31,18]] },
+  castle:   { name: 'CASTLE',        node: '20,9',  slots: [[18,8],[19,8],[21,8],[22,8],[20,8]] },
+  library:  { name: 'LIBRARY',       node: '6,9',   slots: [[4,8],[5,8],[7,8],[8,8]] },
+  barracks: { name: 'BARRACKS',      node: '34,9',  slots: [[32,8],[33,8],[35,8],[36,8]] },
+  forge:    { name: 'FORGE',         node: '6,16',  slots: [[4,15],[5,15],[7,15],[8,15]] },
+  tavern:   { name: 'TAVERN',        node: '34,16', slots: [[32,15],[33,15],[35,15],[36,15]] },
+  market:   { name: 'MARKET',        node: '20,12', slots: [[18,11],[19,13],[21,11],[22,13],[18,13],[22,11]] },
+  farm:     { name: 'ARCHIVES',      node: '8,18',  slots: [[4,19],[6,20],[10,19],[12,20],[5,21],[11,21]] },
+  docks:    { name: 'DOCKS',         node: '30,17', slots: [[30,19],[31,20],[30,21],[31,18]] },
+  arena:    { name: 'ARENA FIGHT',   node: '46,5',  slots: [[43,5],[49,5],[45,6],[47,6]] },
+  stands:   { name: 'WATCHING FIGHT', node: '46,5', slots: [[42,2],[44,2],[48,2],[50,2],[43,3],[45,3],[47,3],[49,3]] },
+  theatre:  { name: 'ON STAGE',      node: '46,12', slots: [[44,12],[46,12],[48,12],[45,13],[47,13]] },
+  audience: { name: 'WATCHING SHOW', node: '46,14', slots: [[42,15],[44,14],[48,14],[50,15],[43,14],[49,15]] },
 };
+const REST = ['tavern', 'stands', 'audience'];   // where idle agents spend their breaks
 const GATE = '20,23';
 const nodes = new Map();
 const nk = (x, y) => x + ',' + y;
 function addNode(x, y) { const k = nk(x, y); if (!nodes.has(k)) nodes.set(k, { x, y, adj: new Set() }); return nodes.get(k); }
 const roadTiles = new Set();
-for (const line of ROADS) for (let i = 0; i < line.length; i++) {
+for (const [lines, draw] of [[ROADS, true], [PATHS, false]]) for (const line of lines) for (let i = 0; i < line.length; i++) {
   const [x, y] = line[i]; addNode(x, y);
   if (i) { const [px, py] = line[i - 1]; const a = addNode(px, py), b = addNode(x, y); a.adj.add(nk(x, y)); b.adj.add(nk(px, py));
-    for (let tx = Math.min(px, x); tx <= Math.max(px, x); tx++) for (let ty = Math.min(py, y); ty <= Math.max(py, y); ty++) roadTiles.add(nk(tx, ty)); }
+    if (draw) for (let tx = Math.min(px, x); tx <= Math.max(px, x); tx++) for (let ty = Math.min(py, y); ty <= Math.max(py, y); ty++) roadTiles.add(nk(tx, ty)); }
 }
 function bfs(from, to) {
   const prev = new Map([[from, null]]), q = [from];
@@ -59,7 +80,7 @@ function bfs(from, to) {
 }
 const footPx = (tx, ty) => [tx * T + 8, ty * T + 13];
 const nodePx = k => { const n = nodes.get(k); return footPx(n.x, n.y); };
-const isWater = (tx, ty) => ty >= 18 && tx >= (ty < 20 ? 25 : ty < 22 ? 24 : 23);
+const isWater = (tx, ty) => ty >= 18 && tx <= 39 && tx >= (ty < 20 ? 25 : ty < 22 ? 24 : 23);
 
 /* ---------------------------------------------------------------- static map */
 const stat = document.createElement('canvas'); stat.width = CW; stat.height = CH;
@@ -157,6 +178,64 @@ function field(g, x0, x1, kind) {
   }
 }
 
+function arena(g) {
+  const r = mulberry32(5), x0 = 41 * T, y0 = T, w = 10 * T;
+  mark(41, 1, 10, 7);
+  R(g, x0 + 4, y0 + 7 * T - 2, w, 6, 'rgba(0,0,0,.28)');
+  // sand floor with raked lines
+  R(g, x0, y0 + 3 * T, w, 4 * T, '#d9c58a');
+  for (let i = 0; i < 60; i++) R(g, x0 + 8 + r() * (w - 20), y0 + 3 * T + r() * 4 * T, 3 + r() * 5, 1, i % 3 ? '#c4ae72' : '#e8d9a6');
+  // back wall (stone) with crenellations
+  R(g, x0, y0, w, T, '#8d939c');
+  for (let yy = y0, k = 0; yy < y0 + T; yy += 8, k++) { R(g, x0, yy, w, 1, '#6f7686'); for (let xx = x0 + (k % 2 ? 6 : 0); xx < x0 + w; xx += 12) R(g, xx, yy, 1, 8, '#6f7686'); }
+  for (let cx = x0; cx < x0 + w; cx += 12) { R(g, cx, y0 - 6, 8, 6, '#8d939c'); R(g, cx, y0 - 6, 8, 1, '#b4bac4'); }
+  // two spectator tiers
+  const tier = (y, col, dark) => { R(g, x0 + 8, y, w - 16, T, col); for (let i = 0; i < 4; i++) R(g, x0 + 8, y + 3 + i * 4, w - 16, 1, dark); R(g, x0 + 8, y + T - 2, w - 16, 2, 'rgba(0,0,0,.3)'); };
+  tier(y0 + T, '#9a6a38', '#6b4423'); tier(y0 + 2 * T, '#b8864a', '#7a5226');
+  // side walls
+  R(g, x0, y0, 8, 7 * T, '#8d939c'); R(g, x0 + w - 8, y0, 8, 7 * T, '#8d939c'); R(g, x0 + 6, y0, 2, 7 * T, '#6f7686'); R(g, x0 + w - 8, y0, 2, 7 * T, '#6f7686');
+  // front wall with gate at tile 46
+  for (const [a, b] of [[x0, 46 * T], [47 * T, x0 + w]]) { R(g, a, y0 + 6 * T + 4, b - a, 12, '#8d939c'); R(g, a, y0 + 6 * T + 4, b - a, 2, '#b4bac4'); for (let xx = a; xx < b; xx += 12) R(g, xx, y0 + 6 * T + 4, 1, 12, '#6f7686'); }
+  R(g, 46 * T - 3, y0 + 6 * T - 6, 3, 22, '#5d544d'); R(g, 47 * T, y0 + 6 * T - 6, 3, 22, '#5d544d');
+  lights.push([46 * T - 2, y0 + 6 * T, 26], [47 * T + 2, y0 + 6 * T, 26]);
+  // banners on the back wall
+  for (const bx of [x0 + 20, x0 + 52, x0 + 100, x0 + 132]) { R(g, bx, y0 + 1, 8, 12, bx % 2 ? '#c0394b' : '#2f5fb8'); R(g, bx + 3, y0 + 4, 2, 6, '#ffd23f'); }
+  // straw training dummies
+  for (const dx of [42, 50]) { const px = dx * T + 8, py = 5 * T + 12;
+    R(g, px - 5, py, 10, 3, 'rgba(0,0,0,.25)'); R(g, px - 1, py - 22, 2, 22, '#6b4a2a'); R(g, px - 8, py - 17, 16, 3, '#6b4a2a');
+    R(g, px - 6, py - 15, 12, 9, '#d9b86a'); R(g, px - 4, py - 13, 8, 5, '#c0394b'); R(g, px - 2, py - 11, 4, 1, '#fff'); R(g, px - 4, py - 25, 8, 7, '#d9b86a'); R(g, px - 4, py - 22, 8, 1, '#a88a3a'); }
+  labels.push(['ARENA', x0 + w / 2, 2]);
+}
+
+function theatre(g) {
+  const x0 = 41 * T, y0 = 10 * T, w = 10 * T;
+  mark(41, 10, 10, 6);
+  R(g, x0 + 4, y0 + 6 * T - 2, w, 6, 'rgba(0,0,0,.28)');
+  // audience floor
+  R(g, x0, y0 + 4 * T, w, 2 * T, '#9a7a52'); for (let i = 0; i < 30; i++) R(g, x0 + 6 + (i * 37) % (w - 12), y0 + 4 * T + (i * 11) % (2 * T), 3, 1, '#7d6140');
+  // stage back wall with painted backdrop
+  R(g, x0, y0, w, 2 * T, '#5a3a1e'); R(g, x0 + 24, y0 + 4, w - 48, 2 * T - 4, '#6aa0d8'); R(g, x0 + 24, y0 + 22, w - 48, 10, '#4f8a3c');
+  R(g, x0 + 64, y0 + 10, 12, 14, '#a2a8b3'); R(g, x0 + 80, y0 + 6, 14, 18, '#a2a8b3'); R(g, x0 + 66, y0 + 8, 8, 2, '#c0394b'); R(g, x0 + 84, y0 + 3, 6, 3, '#c0394b'); R(g, x0 + 86, y0 + 12, 2, 6, '#2a2030');
+  R(g, x0 + 44, y0 + 6, 10, 4, '#fff'); R(g, x0 + 112, y0 + 8, 12, 4, '#fff');
+  // stage floor (raised) with front edge
+  R(g, x0, y0 + 2 * T, w, 2 * T, '#b8864a');
+  for (let yy = y0 + 2 * T; yy < y0 + 4 * T; yy += 8) R(g, x0, yy, w, 1, '#8a5e2e');
+  for (let xx = x0 + 10; xx < x0 + w; xx += 20) R(g, xx, y0 + 2 * T, 1, 2 * T, '#9c6f38');
+  R(g, x0, y0 + 4 * T - 5, w, 5, '#6b4423'); R(g, x0, y0 + 4 * T - 5, w, 1, '#8a5e2e');
+  // curtains + valance + roof beam
+  for (const [cx, dir] of [[x0, 1], [x0 + w - 26, -1]]) { for (let i = 0; i < 26; i++) { const len = 2 * T + 8 - Math.floor(i * 0.5) * (dir > 0 ? 0 : 0); R(g, cx + i, y0 - 2, 1, len, i % 4 < 2 ? '#a8232f' : '#8a1a24'); } R(g, cx, y0 + 2 * T + 6, 26, 2, '#ffd23f'); }
+  R(g, x0 - 4, y0 - 10, w + 8, 12, '#4a2f17'); R(g, x0 - 4, y0 - 10, w + 8, 2, '#6b4423');
+  for (let xx = x0 + 4; xx < x0 + w; xx += 12) { R(g, xx, y0 + 2, 6, 6, '#a8232f'); R(g, xx + 1, y0 + 8, 4, 2, '#ffd23f'); }
+  R(g, x0 - 4, y0 - 10, 6, 6 * T + 6, '#4a2f17'); R(g, x0 + w - 2, y0 - 10, 6, 6 * T + 6, '#4a2f17');
+  // footlights
+  for (let xx = x0 + 18; xx < x0 + w - 12; xx += 20) { R(g, xx, y0 + 4 * T - 8, 4, 3, '#ffd23f'); lights.push([xx + 2, y0 + 4 * T - 7, 22]); }
+  // audience benches (aisle at tile 46) and red carpet
+  for (const row of [14, 15]) for (let tx = 41; tx <= 50; tx++) { if (tx === 46) continue; const px = tx * T, py = row * T + 6;
+    R(g, px + 1, py, 14, 4, '#7a5226'); R(g, px + 1, py, 14, 1, '#a8763a'); R(g, px + 1, py - 5, 14, 2, '#5a3a1e'); R(g, px + 2, py + 4, 2, 4, '#4a2f17'); R(g, px + 12, py + 4, 2, 4, '#4a2f17'); }
+  R(g, 46 * T + 2, y0 + 4 * T, 12, 2 * T, '#a8232f'); R(g, 46 * T + 2, y0 + 4 * T, 2, 2 * T, '#ffd23f'); R(g, 46 * T + 12, y0 + 4 * T, 2, 2 * T, '#ffd23f');
+  labels.push(['THEATRE', x0 + w / 2, y0 - 22]);
+}
+
 function buildStatic() {
   const g = sg, r = mulberry32(11);
   // grass
@@ -184,7 +263,7 @@ function buildStatic() {
   for (let tx = 18; tx <= 22; tx++) for (let ty = 11; ty <= 13; ty++) { mark(tx, ty, 1, 1);
     R(g, tx * T, ty * T, T, T, '#b9a98a'); R(g, tx * T + 8, ty * T, 1, T, '#9a8a6c'); R(g, tx * T, ty * T + 8, T, 1, '#9a8a6c'); R(g, tx * T + 4, ty * T + 3, 3, 2, '#d0c3a6'); }
   // buildings
-  castle(g);
+  castle(g); arena(g); theatre(g);
   building(g, 3, 2, 6, 5, { wall: '#c9b99a', wallDark: '#a89878', roof: '#3a5cc0', roofDark: '#2d4a9e', roofLight: '#6a88e0', glass: '#4a7ac0', label: 'LIBRARY' });
   building(g, 31, 2, 7, 5, { wall: '#8d94a3', wallDark: '#6f7686', roof: '#8a2430', roofDark: '#6a1a24', roofLight: '#b84050', label: 'BARRACKS' });
   building(g, 3, 10, 6, 5, { wall: '#9a8a78', wallDark: '#7a6a58', roof: '#5a4630', roofDark: '#463623', roofLight: '#7a6040', chimney: true, label: 'FORGE' });
@@ -210,7 +289,7 @@ function buildStatic() {
   const spots = [];
   for (let ty = 0; ty < H; ty++) for (let tx = 0; tx < W; tx++) if (!occ[ty * W + tx]) spots.push([tx, ty]);
   const near = (tx, ty) => { for (const L of Object.values(LOC)) for (const [sx, sy] of L.slots) if (Math.abs(sx - tx) <= 1 && Math.abs(sy - ty) <= 1) return true; return false; };
-  const treeSpots = spots.filter(([tx, ty]) => !near(tx, ty) && ty > 0 && !(ty >= 8 && ty <= 9) && !(ty >= 15 && ty <= 17 && tx > 2 && tx < 38) && !(tx >= 19 && tx <= 21));
+  const treeSpots = spots.filter(([tx, ty]) => !near(tx, ty) && ty > 0 && !(ty >= 8 && ty <= 9) && !(ty >= 15 && ty <= 17 && tx > 2 && tx < 48) && !(tx >= 19 && tx <= 21));
   const placed = [];
   for (let n = 0; n < 220 && placed.length < 46; n++) {
     const [tx, ty] = treeSpots[Math.floor(r() * treeSpots.length)];
@@ -229,10 +308,11 @@ function buildStatic() {
 
 /* ---------------------------------------------------------------- sprites */
 const sprites = {};
-function makeSprite(role, frame) {
+function makeSprite(look, pal, frame) {
   const c = document.createElement('canvas'); c.width = 20; c.height = 24; const g = c.getContext('2d');
   const r = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x + 2, y + 1, w, h); };
-  const S = ROLES[role], skin = '#f1c9a0', dark = '#2b2118', step = frame === 1 ? 1 : frame === 2 ? -1 : 0;
+  const S = { ...LOOKS[look] }; if (pal.body) S.body = pal.body;
+  const acc = pal.accent, skin = '#f1c9a0', dark = '#2b2118', step = frame === 1 ? 1 : frame === 2 ? -1 : 0;
   r(3, 19, 10, 3, 'rgba(0,0,0,.28)');
   const lh = step === 1 ? 3 : 4, rh = step === -1 ? 3 : 4;
   r(5, 16, 2, lh, S.legs); r(9, 16, 2, rh, S.legs); r(5, 16 + lh, 3, 1, dark); r(9, 16 + rh, 3, 1, dark);
@@ -240,9 +320,9 @@ function makeSprite(role, frame) {
   r(3, 10 + (step === 1 ? 1 : 0), 1, 5, S.body); r(12, 10 + (step === -1 ? 1 : 0), 1, 5, S.body);
   r(3, 15 + (step === 1 ? 1 : 0), 1, 1, skin); r(12, 15 + (step === -1 ? 1 : 0), 1, 1, skin);
   r(5, 3, 6, 6, skin); r(6, 5, 1, 2, dark); r(9, 5, 1, 2, dark); r(5, 8, 6, 1, 'rgba(0,0,0,.12)');
-  switch (role) {
-    case 'knight': r(4, 2, 8, 3, '#b7c0cf'); r(4, 2, 8, 1, '#e0e6ee'); r(4, 5, 1, 3, '#b7c0cf'); r(11, 5, 1, 3, '#b7c0cf'); r(7, 5, 2, 2, '#9aa4b4'); r(7, 0, 2, 2, '#c0392b'); r(8, -0, 1, 1, '#e8584a');
-      r(0, 10, 4, 6, '#2f5fb8'); r(1, 10, 1, 6, '#f0d060'); r(0, 12, 4, 1, '#f0d060'); r(13, 5, 1, 9, '#e6e6ee'); r(12, 13, 3, 1, '#c9a227'); r(13, 14, 1, 2, '#6b4a2a'); break;
+  switch (look) {
+    case 'knight': r(4, 2, 8, 3, '#b7c0cf'); r(4, 2, 8, 1, '#e0e6ee'); r(4, 5, 1, 3, '#b7c0cf'); r(11, 5, 1, 3, '#b7c0cf'); r(7, 5, 2, 2, '#9aa4b4'); r(7, 0, 2, 2, '#c0392b'); r(8, 0, 1, 1, '#e8584a');
+      r(0, 10, 4, 6, acc || '#2f5fb8'); r(1, 10, 1, 6, '#f0d060'); r(0, 12, 4, 1, '#f0d060'); r(13, 5, 1, 9, '#e6e6ee'); r(12, 13, 3, 1, '#c9a227'); r(13, 14, 1, 2, '#6b4a2a'); break;
     case 'merchant': r(2, 3, 12, 1, '#d9a521'); r(4, 1, 8, 2, '#d9a521'); r(10, 0, 1, 2, '#c0392b'); r(4, 3, 8, 1, '#8a6a10'); r(11, 13, 3, 3, '#c9a227'); r(12, 12, 1, 1, '#6b4a2a'); r(4, 15, 8, 1, S.body); break;
     case 'trader': r(4, 2, 8, 3, S.hat); r(4, 5, 1, 3, S.hat); r(11, 5, 1, 3, S.hat); r(0, 9, 4, 7, '#8a5a2b'); r(0, 9, 4, 1, '#c9a06a'); r(0, 12, 4, 1, '#5a3a1e'); r(13, 2, 1, 16, '#6b4a2a'); r(12, 1, 3, 2, '#c9a227'); break;
     case 'worker': r(4, 2, 8, 2, S.hat); r(3, 4, 10, 1, S.hat); r(5, 11, 6, 5, '#d8c9a8'); r(13, 9, 1, 7, '#6b4a2a'); r(12, 8, 3, 2, '#8d939c'); break;
@@ -253,47 +333,75 @@ function makeSprite(role, frame) {
     case 'scribe': r(4, 3, 8, 1, S.body); r(5, 2, 6, 1, S.body); r(6, 1, 4, 1, S.body); r(7, 0, 2, 1, S.body); r(8, 2, 1, 1, '#ffd23f'); r(3, 4, 10, 1, '#2d4a9e');
       r(12, 11, 4, 5, '#7a3b2e'); r(12, 11, 4, 1, '#e8d8a8'); r(13, 12, 2, 1, '#e8d8a8'); break;
     case 'bard': r(4, 2, 8, 2, '#c0392b'); r(3, 4, 10, 1, '#c0392b'); r(11, 0, 1, 3, '#f5f5f5'); r(12, 11, 4, 5, '#a0652f'); r(13, 12, 2, 2, '#4a2f17'); r(15, 6, 1, 6, '#6b4a2a'); break;
+    case 'herald': r(4, 2, 8, 2, '#1e3f78'); r(3, 4, 10, 1, '#1e3f78'); r(11, 0, 1, 3, acc || '#d9a521'); r(7, 9, 2, 7, acc || '#d9a521'); r(7, 11, 2, 2, '#c0392b');
+      r(12, 9, 3, 2, '#d9a521'); r(14, 8, 2, 1, '#d9a521'); r(15, 7, 1, 1, '#d9a521'); r(12, 11, 1, 1, '#a07a10'); break;
+    case 'judge': r(4, 2, 8, 3, '#f2f2f2'); r(4, 5, 1, 3, '#f2f2f2'); r(11, 5, 1, 3, '#f2f2f2'); r(3, 4, 1, 3, '#d8d8d8'); r(12, 4, 1, 3, '#d8d8d8');
+      r(5, 9, 6, 1, acc || '#ffd23f'); r(7, 10, 2, 3, acc || '#ffd23f'); r(4, 15, 8, 1, '#f2f2f2'); r(13, 11, 1, 4, '#6b4a2a'); r(12, 10, 3, 2, '#6b4a2a'); break;
+    case 'architect': r(3, 2, 10, 2, acc || '#8a4a2a'); r(5, 1, 6, 1, acc || '#8a4a2a'); r(11, 10, 5, 3, '#8ac0ff'); r(11, 10, 5, 1, '#ffffff'); r(13, 5, 1, 9, '#c9a227'); r(12, 4, 3, 1, '#c9a227'); r(12, 13, 1, 2, '#c9a227'); r(14, 13, 1, 2, '#c9a227'); break;
+    case 'steward': r(4, 2, 8, 2, '#4a6a42'); r(3, 4, 10, 1, '#4a6a42'); r(12, 10, 4, 6, '#4a3520'); r(12, 10, 4, 1, '#e8d8a8'); r(13, 12, 2, 1, '#9fe08a'); r(13, 14, 2, 1, '#9fe08a'); r(10, 13, 2, 3, '#d9a521'); break;
+    case 'archivist': r(4, 2, 8, 2, '#4a2f66'); r(7, 0, 3, 2, '#4a2f66'); r(5, 5, 6, 1, '#c9a227'); r(5, 4, 2, 2, '#9ad0ff'); r(9, 4, 2, 2, '#9ad0ff'); r(13, 8, 1, 8, '#d9a521'); r(12, 8, 3, 2, '#d9a521'); r(12, 15, 1, 1, '#d9a521'); r(14, 14, 2, 2, '#8a5a2b'); break;
+    case 'inquisitor': r(4, 2, 8, 6, '#1a1a24'); r(6, 4, 4, 3, skin); r(6, 5, 1, 2, dark); r(9, 5, 1, 2, dark); r(4, 8, 8, 1, '#1a1a24');
+      r(13, 11, 3, 4, '#ffd23f'); r(13, 10, 3, 1, '#555'); r(14, 9, 1, 1, '#555'); r(12, 11, 1, 4, '#555'); r(14, 12, 1, 2, '#fff7c0'); break;
+    case 'jester': r(8, 9, 4, 7, acc || '#2f5fb8'); r(2, 2, 4, 2, '#c0392b'); r(1, 0, 2, 3, '#c0392b'); r(10, 2, 4, 2, acc || '#2f5fb8'); r(12, 0, 2, 3, acc || '#2f5fb8'); r(5, 3, 6, 1, '#ffd23f'); r(1, 0, 1, 1, '#ffd23f'); r(13, 0, 1, 1, '#ffd23f');
+      r(13, 6, 1, 10, '#6b4a2a'); r(12, 4, 3, 3, '#ffd23f'); r(13, 5, 1, 1, '#c0392b'); break;
+    case 'plaguedoctor': r(2, 3, 12, 1, '#1a1a1a'); r(4, 1, 8, 2, '#1a1a1a'); r(5, 3, 6, 5, '#cdbd9a'); r(10, 5, 4, 2, '#cdbd9a'); r(13, 6, 1, 1, '#a89a78'); r(6, 4, 2, 2, '#bfe8ff'); r(4, 15, 8, 2, S.body); r(13, 3, 1, 14, '#6b4a2a'); r(12, 3, 3, 1, '#c9a227'); break;
+    case 'alchemist': r(4, 2, 8, 2, '#2a4a52'); r(3, 4, 10, 1, '#2a4a52'); r(5, 4, 6, 2, '#8a5a2b'); r(6, 4, 2, 2, '#9ad0ff'); r(9, 4, 2, 2, '#9ad0ff');
+      r(12, 11, 3, 4, '#9a5fe0'); r(13, 9, 1, 2, '#ccc'); r(12, 11, 3, 1, '#d8b8ff'); r(4, 15, 8, 1, '#2a4a52'); break;
   }
   const id = g.getImageData(0, 0, 20, 24), d = id.data, A = (x, y) => (x < 0 || y < 0 || x > 19 || y > 23) ? 0 : d[(y * 20 + x) * 4 + 3];
-  const out = [];
-  for (let y = 0; y < 24; y++) for (let x = 0; x < 20; x++) if (A(x, y) < 200 && (A(x - 1, y) >= 200 || A(x + 1, y) >= 200 || A(x, y - 1) >= 200 || A(x, y + 1) >= 200)) out.push([x, y]);
-  g.fillStyle = '#1a120b'; for (const [x, y] of out) g.fillRect(x, y, 1, 1);
+  g.fillStyle = '#1a120b';
+  for (let y = 0; y < 24; y++) for (let x = 0; x < 20; x++) if (A(x, y) < 200 && (A(x - 1, y) >= 200 || A(x + 1, y) >= 200 || A(x, y - 1) >= 200 || A(x, y + 1) >= 200)) g.fillRect(x, y, 1, 1);
   return c;
 }
-function getSprite(role, frame) { const k = role + frame; return sprites[k] || (sprites[k] = makeSprite(role, frame)); }
+function getSprite(a, frame) { const k = a.look + (a.pal.body || '') + (a.pal.accent || '') + frame; return sprites[k] || (sprites[k] = makeSprite(a.look, a.pal, frame)); }
 
 /* ---------------------------------------------------------------- agents */
 const agents = new Map();
 const particles = [];
 const stats = { events: 0, errors: 0 };
-let clockNow = 0;
 const overlay = $('#overlay');
+const now = () => performance.now() / 1000;
+let fightOn = false, showOn = false;   // is anyone fighting in the arena / performing on stage right now?
 
-function toolLoc(t) {
-  t = (t || '').toLowerCase();
-  if (!t) return 'tavern';
+const TEST_RE = /\b(test|tests|jest|pytest|vitest|mocha|rspec|phpunit|xctest|e2e)\b/i;
+const DEPLOY_RE = /\b(deploy|docker push|kubectl|helm|terraform apply|vercel|netlify|git push|npm publish|firebase deploy)\b/i;
+const BUILD_RE = /\b(build|compile|make|assemble|webpack|tsc)\b/i;
+function toolLoc(t, text) {
+  t = (t || '').toLowerCase(); if (!t) return null;
   if (t.startsWith('mcp__')) return 'docks';
   if (/^(read|grep|glob|ls|notebookread)$/.test(t)) return 'library';
   if (/^(edit|write|multiedit|notebookedit)$/.test(t)) return 'forge';
-  if (t === 'bash' || t === 'shell') return 'barracks';
+  if (t === 'bash' || t === 'shell') { const c = text || ''; return TEST_RE.test(c) ? 'arena' : DEPLOY_RE.test(c) ? 'docks' : BUILD_RE.test(c) ? 'forge' : 'barracks'; }
   if (/web/.test(t)) return 'market';
   if (/^(task|agent|todowrite|exitplanmode|plan)/.test(t)) return 'castle';
   if (/db|sql|data|memory|query|ingest/.test(t)) return 'farm';
-  if (/notif|stop|idle|chat|message/.test(t)) return 'tavern';
+  if (/notif|stop|idle|chat|message/.test(t)) return pickRest();
   return 'castle';
 }
+function pickRest() {
+  const w = { tavern: 1, stands: fightOn ? 4 : 1, audience: showOn ? 4 : 1 }; let r = Math.random() * (w.tavern + w.stands + w.audience);
+  for (const k of REST) if ((r -= w[k]) < 0) return k; return 'tavern';
+}
 
-function spawn(id, ev, tool) {
-  const role = ROLES[ev.role] ? ev.role : LOC_ROLE[toolLoc(tool)];
+function spawn(id, ev, loc) {
+  const rid = String(ev.role || '').slice(0, 40), def = ROLEDEF[rid];
+  let look, pal, name, title, home = null;
+  if (def) { look = LOOKS[def.look] ? def.look : 'knight'; pal = { body: def.body, accent: def.accent }; name = def.name; title = def.title || ''; home = def.home; }
+  else { look = LOOKS[rid] ? rid : (LOC_LOOK[loc] || 'merchant'); pal = {}; name = fallbackName(id, look); title = ''; }
+  if (ev.name) name = String(ev.name).slice(0, 24);
+  if (rid === 'orchestrator' && ev.project) title = String(ev.project).slice(0, 20);
+  const color = LOOKS[look].color;
   const el = document.createElement('div'); el.className = 'ag';
-  const nm = document.createElement('div'); nm.className = 'nm'; const bub = document.createElement('div'); bub.className = 'bub';
+  const nm = document.createElement('div'); nm.className = 'nm'; nm.style.color = color;
+  const n1 = document.createElement('span'); n1.textContent = name; nm.append(n1);
+  if (title) { const n2 = document.createElement('span'); n2.className = 't'; n2.textContent = title; nm.append(n2); }
+  const bub = document.createElement('div'); bub.className = 'bub';
   el.append(bub, nm); overlay.append(el);
   const [x, y] = nodePx(GATE);
-  const a = { id, role, name: String(ev.name || roleName(id, role)).slice(0, 24), x, y, path: [], node: GATE, loc: null, slot: null, state: 'idle', busy: false, busyUntil: 0, facing: 1, anim: Math.random() * 9, lastEvent: now(), status: 'idle', text: '', el, nm, bub, bubUntil: 0, partT: 0, leaving: false };
-  nm.textContent = a.name; nm.style.color = ROLES[role].color;
+  const a = { id, rid, look, pal, color, name, title, home, x, y, path: [], node: GATE, loc: null, slot: null, state: 'idle', busy: false, busyUntil: 0, hold: false, holdUntil: 0, facing: 1,
+    anim: Math.random() * 9, lastEvent: now(), status: 'idle', text: '', el, bub, bubUntil: 0, partT: 0, leaving: false };
   agents.set(id, a); return a;
 }
-const now = () => performance.now() / 1000;
 
 function goTo(a, loc) {
   const L = LOC[loc]; if (!L) return;
@@ -309,9 +417,10 @@ function goTo(a, loc) {
   const [px, py] = footPx(s[0], s[1]); const p = [px + rand(-3, 3), py + rand(-1, 1)]; p.slot = true; a.path.push(p);
 }
 
-function say(a, text, status, secs) {
+function say(a, text, status, secs, label) {
   a.bub.className = 'bub on ' + status; a.bub.textContent = '';
-  if (status === 'done' || status === 'error') { const b = document.createElement('b'); b.textContent = status === 'done' ? 'DONE' : 'FAILED'; a.bub.append(b); }
+  const tag = label || (status === 'done' ? 'DONE' : status === 'error' ? 'FAILED' : '');
+  if (tag) { const b = document.createElement('b'); b.textContent = tag; a.bub.append(b); }
   a.bub.append(document.createTextNode(text.slice(0, 48))); a.bubUntil = now() + secs;
 }
 
@@ -321,46 +430,59 @@ function emit(ev) {
   if (!ev || typeof ev !== 'object') return;
   const id = String(ev.agent || 'unknown').slice(0, 40);
   const status = ['start', 'done', 'error', 'idle'].includes(ev.status) ? ev.status : 'start';
-  const tool = String(ev.tool || '').slice(0, 60);
-  const text = String(ev.text || tool || '...').slice(0, 120);
-  const a = agents.get(id) || spawn(id, ev, tool);
-  const loc = status === 'idle' ? 'tavern' : (LOC[ev.location] ? ev.location : toolLoc(tool));
-  a.lastEvent = now(); a.status = status; a.text = text; a.busy = status === 'start'; a.busyUntil = now() + 10;
+  const tool = String(ev.tool || '').slice(0, 60), text = String(ev.text || tool || '...').slice(0, 120);
+  const report = ev.activity === 'report', def = ROLEDEF[String(ev.role || '')];
+  let loc = LOC[ev.location] ? ev.location : null;
+  if (!loc) loc = report ? 'theatre' : status === 'idle' ? pickRest() : (toolLoc(tool, text) || (def && def.home) || 'castle');
+  const a = agents.get(id) || spawn(id, ev, loc);
+  const t = now();
+  a.lastEvent = t; a.status = status; a.text = text;
+  if (ev.hold === true) { a.hold = true; } else if (ev.hold === false || status === 'idle') a.hold = false;
+  if (a.hold) a.holdUntil = t + 600;
+  a.busy = status === 'start' || report; a.busyUntil = t + (report ? 8 : a.hold ? 600 : 10);
   if (a.loc !== loc || a.leaving) goTo(a, loc);
-  say(a, text, status === 'idle' ? 'start' : status, status === 'start' ? 6 : 3.5);
+  say(a, text, status === 'idle' ? 'start' : status, report ? 6 : status === 'start' ? 6 : 3.5, report ? 'REPORT' : '');
   if (status === 'done') burst(a.x, a.y - 14, '#ffd23f', 8);
   if (status === 'error') { burst(a.x, a.y - 14, '#e5484d', 10); stats.errors++; }
+  if (report) burst(a.x, a.y - 14, '#ff9ec0', 8);
   stats.events++;
-  logEvent(a, text, status);
+  logEvent(a, text, report ? 'report' : status);
   $('#empty').classList.add('hide');
 }
 
-const LOCATION_FX = { forge: ['#ff9a2a', 0.12], barracks: ['#ffffff', 0.4], library: ['#7fd0ff', 0.45], market: ['#ffd23f', 0.5], farm: ['#8fd070', 0.4], docks: ['#9fd0ff', 0.35], castle: ['#ffd23f', 0.7], tavern: ['#ff9ec0', 0.8] };
+const LOCATION_FX = { forge: ['#ff9a2a', 0.12], barracks: ['#ffffff', 0.4], library: ['#7fd0ff', 0.45], market: ['#ffd23f', 0.5], farm: ['#8fd070', 0.4], docks: ['#9fd0ff', 0.35],
+  castle: ['#ffd23f', 0.7], tavern: ['#ff9ec0', 0.8], arena: ['#ffffff', 0.14], theatre: ['#ff9ec0', 0.4] };
 
 function updateAgent(a, dt, t) {
   a.anim += dt;
   if (a.path.length) {
-    const p = a.path[0], dx = p[0] - a.x, dy = p[1] - a.y, d = Math.hypot(dx, dy), step = 36 * dt;
+    const p = a.path[0], dx = p[0] - a.x, dy = p[1] - a.y, d = Math.hypot(dx, dy), step = 56 * dt;
     if (d <= step) { a.x = p[0]; a.y = p[1]; a.path.shift(); } else { a.x += dx / d * step; a.y += dy / d * step; if (Math.abs(dx) > .5) a.facing = dx > 0 ? 1 : -1; }
     a.state = 'walking';
   } else {
     if (a.leaving) { a.el.remove(); agents.delete(a.id); return; }
     a.state = a.busy ? 'working' : 'idle';
+    if (a.loc === 'arena' && a.slot) { const sx = +a.slot.split(',')[0]; a.facing = sx <= 43 ? -1 : sx >= 49 ? 1 : sx < 46 ? 1 : -1; }   // face the dummy or the sparring partner
+    if (a.loc === 'theatre' || a.loc === 'audience' || a.loc === 'stands') a.facing = a.loc === 'stands' ? (a.x < 736 ? 1 : -1) : a.facing;
   }
   if (a.busy && t > a.busyUntil) a.busy = false;
+  if (a.hold && t > a.holdUntil) a.hold = false;
   const idleFor = t - a.lastEvent;
-  if (!a.leaving && idleFor > 16 && a.loc !== 'tavern' && !a.path.length) { a.busy = false; goTo(a, 'tavern'); }
-  if (!a.leaving && idleFor > 120) { a.leaving = true; a.loc = null; a.slot = null; if (a.path.length && a.path[a.path.length - 1].slot) a.path.pop(); else if (!a.path.length) a.path.push(nodePx(a.node)); for (const k of bfs(a.node, GATE).slice(1)) a.path.push(nodePx(k)); a.node = GATE; }
-  if (a.state === 'working' && LOCATION_FX[a.loc]) { a.partT -= dt; if (a.partT <= 0) { a.partT = LOCATION_FX[a.loc][1] * rand(.7, 1.3); burst(a.x + a.facing * 8, a.y - 6, LOCATION_FX[a.loc][0], 2, .7); } }
+  if (!a.leaving && !a.hold && idleFor > 16 && !REST.includes(a.loc) && !a.path.length) { a.busy = false; goTo(a, pickRest()); }
+  if (!a.leaving && !a.hold && idleFor > 120) { a.leaving = true; a.loc = null; a.slot = null; if (a.path.length && a.path[a.path.length - 1].slot) a.path.pop(); else if (!a.path.length) a.path.push(nodePx(a.node)); for (const k of bfs(a.node, GATE).slice(1)) a.path.push(nodePx(k)); a.node = GATE; }
+  a.cheer = a.state === 'idle' && ((a.loc === 'stands' && fightOn) || (a.loc === 'audience' && showOn));
+  const fx = a.state === 'working' ? LOCATION_FX[a.loc] : a.cheer ? ['#ffd23f', 0.8] : null;
+  if (fx) { a.partT -= dt; if (a.partT <= 0) { a.partT = fx[1] * rand(.7, 1.3); burst(a.x + (a.cheer ? 0 : a.facing * 8), a.y - (a.cheer ? 20 : 6), fx[0], a.cheer ? 1 : 2, .7); } }
   if (a.bubUntil && t > a.bubUntil) { a.bub.classList.remove('on'); a.bubUntil = 0; }
 }
 
 function drawAgent(a) {
   let frame = 0, bob = 0;
   if (a.state === 'walking') frame = [1, 0, 2, 0][Math.floor(a.anim * 8) % 4];
-  else if (a.state === 'working') { frame = Math.floor(a.anim * 5) % 2 ? 1 : 0; bob = frame ? -1 : 0; }
+  else if (a.state === 'working') { frame = Math.floor(a.anim * (a.loc === 'arena' ? 7 : 5)) % 2 ? 1 : 0; bob = frame ? -1 : 0; }
+  else if (a.cheer) bob = Math.floor(a.anim * 4) % 2 ? -2 : 0;
   else bob = Math.sin(a.anim * 2) > .6 ? -1 : 0;
-  const spr = getSprite(a.role, frame), x = Math.round(a.x), y = Math.round(a.y + bob);
+  const spr = getSprite(a, frame), x = Math.round(a.x), y = Math.round(a.y + bob);
   ctx.save(); ctx.translate(x, y - 21);
   if (a.facing < 0) ctx.scale(-1, 1);
   ctx.drawImage(spr, -10, 0); ctx.restore();
@@ -379,7 +501,7 @@ function drawLabel(text, cx, y) {
 }
 
 function frame(ms) {
-  const t = ms / 1000, dt = Math.min(.05, t - last); last = t;
+  const t = ms / 1000, dt = Math.min(.5, t - last); last = t;
   ctx.drawImage(stat, 0, 0);
   // water shimmer + boat
   for (const [x, y, ph] of waterSpark) if (Math.sin(t * 1.6 + ph) > .55) R(ctx, x, y, 4, 1, 'rgba(255,255,255,.4)');
@@ -397,6 +519,7 @@ function frame(ms) {
   smokeT -= dt; if (smokeT <= 0) { smokeT = .45; for (const [x, y] of chimneys) particles.push({ x, y, vx: rand(2, 8), vy: -rand(8, 14), life: 0, max: 2.2, col: 'rgba(210,210,215,.55)', s: 2, g: 0 }); }
   // agents
   const list = [...agents.values()];
+  fightOn = list.some(o => o.loc === 'arena' && o.state === 'working'); showOn = list.some(o => o.loc === 'theatre' && o.state === 'working');
   for (const a of list) updateAgent(a, dt, t);
   list.sort((p, q) => p.y - q.y);
   for (const a of list) drawAgent(a);
@@ -419,8 +542,8 @@ function frame(ms) {
 function logEvent(a, text, status) {
   const log = $('#log'), d = document.createElement('div'); d.className = 'ev ' + status;
   const tm = document.createElement('time'); tm.textContent = new Date().toTimeString().slice(0, 8);
-  const who = document.createElement('b'); who.textContent = a.name + ' '; who.style.color = ROLES[a.role].color; who.style.fontWeight = 'normal';
-  const sp = document.createElement('span'); sp.textContent = (status === 'done' ? 'finished: ' : status === 'error' ? 'FAILED: ' : status === 'idle' ? 'rests: ' : '') + text;
+  const who = document.createElement('b'); who.textContent = a.name + ' '; who.style.color = a.color; who.style.fontWeight = 'normal';
+  const sp = document.createElement('span'); sp.textContent = (status === 'done' ? 'finished: ' : status === 'error' ? 'FAILED: ' : status === 'report' ? 'reports: ' : status === 'idle' ? 'rests: ' : '') + text;
   d.append(tm, who, sp);
   const stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
   log.append(d); while (log.children.length > 80) log.firstChild.remove();
@@ -430,10 +553,21 @@ function refreshUi() {
   $('#sAgents').textContent = agents.size; $('#sEvents').textContent = stats.events; $('#sErrors').textContent = stats.errors;
   const ul = $('#roster'); ul.textContent = '';
   for (const a of agents.values()) {
-    const li = document.createElement('li'); li.style.setProperty('--c', ROLES[a.role].color); if (a.status === 'error') li.classList.add('error');
-    const n = document.createElement('span'); n.className = 'n'; n.textContent = a.name;
+    const li = document.createElement('li'); li.style.setProperty('--c', a.color); if (a.status === 'error') li.classList.add('error');
+    const n = document.createElement('span'); n.className = 'n'; n.textContent = a.name + (a.title ? ' · ' + a.title : '');
     const w = document.createElement('span'); w.className = 'w'; w.textContent = a.leaving ? 'LEAVING' : a.state === 'walking' ? 'TRAVELS' : (LOC[a.loc] ? LOC[a.loc].name : '');
     li.append(n, w); ul.append(li);
+  }
+}
+function buildCast() {
+  const ul = $('#cast'); ul.textContent = '';
+  for (const [id, r] of Object.entries(ROLEDEF)) {
+    const li = document.createElement('li'); const look = LOOKS[r.look] || LOOKS.knight;
+    const i = document.createElement('i'); i.style.background = look.color;
+    const b = document.createElement('b'); b.textContent = r.name; b.style.fontWeight = 'normal'; b.style.color = look.color;
+    const t = document.createElement('span'); t.textContent = ' · ' + (r.title || id);
+    const d = document.createElement('small'); d.textContent = (r.tasks || []).join('. ');
+    li.append(i, b, t, d); ul.append(li);
   }
 }
 
@@ -461,10 +595,14 @@ function connect() {
 }
 window.Realm = { emit, setBadge };
 
-buildStatic(); fit(); connect();
+buildStatic(); fit();
+const rolesLoaded = location.protocol === 'file:' ? Promise.resolve() : fetch('/roles.json').then(r => r.json()).then(j => { ROLEDEF = j.roles || {}; buildCast(); }).catch(() => {});
+rolesLoaded.then(() => {
+  connect();
+  if (/[?&]demo\b/.test(location.search)) setTimeout(() => { window.RealmSim.start(); setBadge(); }, 300);
+  setTimeout(() => { if (!liveConnected && !agents.size && window.RealmSim && !window.RealmSim.running() && !/nodemo/.test(location.search)) { window.RealmSim.start(); setBadge(); } }, 1200);
+});
 if (document.fonts && document.fonts.load) document.fonts.load('8px "Press Start 2P"');
 requestAnimationFrame(frame);
 $('#demoBtn').addEventListener('click', () => { const s = window.RealmSim; s.running() ? s.stop() : s.start(); setBadge(); });
-if (/[?&]demo\b/.test(location.search)) setTimeout(() => { window.RealmSim.start(); setBadge(); }, 300);
-setTimeout(() => { if (!liveConnected && !agents.size && window.RealmSim && !window.RealmSim.running() && !/nodemo/.test(location.search)) { window.RealmSim.start(); setBadge(); } }, 1200);
 })();

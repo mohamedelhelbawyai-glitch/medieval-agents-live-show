@@ -1,36 +1,42 @@
 'use strict';
-// Demo simulator: a cast of fake agents emitting the same events a real agent hook would.
+// Demo simulator: the whole cast working a feature through the phases, emitting the same events a real hook would.
 (() => {
 const pick = a => a[Math.floor(Math.random() * a.length)];
-const CAST = [
-  { id: 'lord-1', role: 'governor', name: 'Lord Aldric' },
-  { id: 'knight-1', role: 'knight', name: 'Sir Gareth' }, { id: 'knight-2', role: 'knight', name: 'Sir Elara' },
-  { id: 'merch-1', role: 'merchant', name: 'Mira' }, { id: 'trader-1', role: 'trader', name: 'Tobias' },
-  { id: 'work-1', role: 'worker', name: 'Bran' }, { id: 'work-2', role: 'worker', name: 'Hild' },
-  { id: 'farm-1', role: 'farmer', name: 'Edda' }, { id: 'scribe-1', role: 'scribe', name: 'Wulf' }, { id: 'bard-1', role: 'bard', name: 'Lark' },
-];
 const ACTS = {
-  governor: [['Task', 'Dispatching a sub-agent'], ['TodoWrite', 'Updating the royal plan'], ['Task', 'Reviewing council report']],
-  knight: [['Bash', 'npm run test'], ['Bash', 'git diff --stat'], ['Bash', 'cargo build --release'], ['Bash', 'docker compose up']],
-  merchant: [['WebSearch', '"pixel art tilesets"'], ['WebFetch', 'docs.anthropic.com'], ['WebSearch', '"css grid guide"']],
-  trader: [['mcp__github__list_prs', 'Fetching open PRs'], ['mcp__slack__post', 'Posting to #builds'], ['mcp__linear__issue', 'Syncing tickets']],
-  worker: [['Edit', 'src/app.ts'], ['Write', 'README.md'], ['Edit', 'styles/main.css'], ['Edit', 'api/routes.py']],
-  farmer: [['db_query', 'SELECT * FROM crops'], ['memory_read', 'Sowing training data'], ['data_ingest', 'Harvesting logs.csv']],
-  scribe: [['Read', 'docs/ARCHITECTURE.md'], ['Grep', 'TODO in src/'], ['Glob', '**/*.test.ts'], ['Read', 'package.json']],
-  bard: [['Notification', 'Singing the status report'], ['Notification', 'Tuning the lute']],
+  'orchestrator': [['Task', 'Dispatching the next phase'], ['TodoWrite', 'Updating the royal plan'], ['Task', 'Reviewing the phase report']],
+  'intake-auditor': [['Read', 'intake.md'], ['Grep', 'missing inputs']],
+  'spec-author': [['Read', 'spec-template.md'], ['Write', 'spec.md'], ['Edit', 'spec.md']],
+  'spec-reviewer': [['Read', 'spec.md'], ['Grep', 'untestable wording']],
+  'feature-architect': [['Read', 'constitution.md'], ['Write', 'plan.md'], ['Edit', 'data-model.md']],
+  'plan-reviewer': [['Read', 'plan.md'], ['Grep', 'plan vs spec']],
+  'task-planner': [['Write', 'tasks.md'], ['TodoWrite', 'Ordering tasks test-first']],
+  'coverage-reviewer': [['Read', 'tasks.md'], ['Grep', 'uncovered requirements']],
+  'flutter-expert': [['Edit', 'lib/cart_cubit.dart'], ['Bash', 'flutter test'], ['Edit', 'lib/ui/cart_page.dart']],
+  'kotlin-specialist': [['Edit', 'CartViewModel.kt'], ['Bash', './gradlew test']],
+  'node-specialist': [['Edit', 'src/routes/cart.ts'], ['Bash', 'npm test']],
+  'sql-pro': [['db_query', 'EXPLAIN ANALYZE orders'], ['Edit', 'migrations/012_cart.sql']],
+  'code-reviewer': [['Read', 'git diff'], ['Bash', 'git diff --stat'], ['Grep', 'SQL injection']],
+  'qa-verifier': [['Bash', 'flutter test --coverage'], ['Bash', 'npm run e2e'], ['Read', 'acceptance.md']],
+  'test-scenario-designer': [['Write', 'test-scenarios.md'], ['Read', 'acceptance.md']],
+  'debugger': [['Grep', 'NullPointerException'], ['Bash', 'dart run --observe'], ['Read', 'stack trace']],
+  'performance-engineer': [['Bash', 'k6 run load.js'], ['db_query', 'pg_stat_statements']],
+  'final-auditor': [['Read', 'qa-report.md'], ['Read', 'spec.md']],
 };
 let timers = [], on = false;
 const later = (fn, ms) => timers.push(setTimeout(fn, ms));
-function loop(c) {
+const emit = e => window.Realm.emit(e);
+function loop(role) {
   if (!on) return;
-  if (Math.random() < .1) { window.Realm.emit({ agent: c.id, name: c.name, role: c.role, status: 'idle', text: 'Taking a break at the tavern' }); return later(() => loop(c), 6000 + Math.random() * 6000); }
-  const [tool, text] = pick(ACTS[c.role]);
-  window.Realm.emit({ agent: c.id, name: c.name, role: c.role, tool, text, status: 'start' });
-  later(() => { window.Realm.emit({ agent: c.id, name: c.name, role: c.role, tool, text, status: Math.random() < .12 ? 'error' : 'done' }); later(() => loop(c), 1500 + Math.random() * 4500); }, 3500 + Math.random() * 3500);
+  const r = Math.random();
+  if (r < .1) { emit({ agent: role, role, status: 'idle', text: 'Taking a break' }); return later(() => loop(role), 6000 + Math.random() * 6000); }
+  if (r < .22 && role !== 'orchestrator') { emit({ agent: role, role, activity: 'report', status: 'idle', text: 'Reporting back to the Conductor' }); return later(() => loop(role), 9000 + Math.random() * 5000); }
+  const [tool, text] = pick(ACTS[role]);
+  emit({ agent: role, role, tool, text, status: 'start' });
+  later(() => { emit({ agent: role, role, tool, text, status: Math.random() < .1 ? 'error' : 'done' }); later(() => loop(role), 1500 + Math.random() * 4500); }, 3500 + Math.random() * 3500);
 }
 window.RealmSim = {
   running: () => on,
-  start() { on = true; CAST.forEach((c, i) => later(() => loop(c), i * 900 + Math.random() * 600)); },
+  start() { on = true; Object.keys(ACTS).forEach((role, i) => later(() => loop(role), i * 1100 + Math.random() * 600)); },
   stop() { on = false; timers.forEach(clearTimeout); timers = []; },
 };
 })();

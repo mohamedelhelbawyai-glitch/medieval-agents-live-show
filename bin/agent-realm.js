@@ -5,14 +5,15 @@ const ROOT = path.resolve(__dirname, '..');
 const pkg = require('../package.json');
 const MARK = '# agent-realm';                       // tags the hook commands we own
 const BLOCK_START = '<!-- agent-realm:start -->', BLOCK_END = '<!-- agent-realm:end -->';
-const EVENTS = [['PreToolUse', '*'], ['PostToolUse', '*'], ['Notification', null], ['Stop', null]];
+const EVENTS = [['PreToolUse', '*'], ['PostToolUse', '*'], ['Notification', null], ['SubagentStop', null], ['Stop', null]];
 
 const HELP = `agent-realm ${pkg.version}: a live pixel medieval town for your working agents
 
 Usage: agent-realm <command> [options]
 
 Commands
-  start                 Start the live show           [--port 4747] [--open] [--demo]
+  start                 Start the live show     [--port 4747] [--open] [--demo] [--roles file]
+  roles                 List the cast (roles.json); --init writes an editable agent-realm.roles.json here
   status                Check whether the show is running      [--port]
   emit                  Send a test event  --agent a1 --tool Bash --status start --text "npm test"
   hook                  (internal) Claude Code hook entry point; reads hook JSON on stdin
@@ -113,11 +114,20 @@ const commands = {
   async start({ f }) {
     const port = portOf(f), url = urlOf(port) + (f.demo ? '/?demo' : '');
     if (await health(port)) { console.log(`Agent Realm is already running at ${urlOf(port)}`); if (f.open) openUrl(url); return; }
-    try { await require('../server').start({ port, quiet: true }); }
+    let srv;
+    try { srv = await require('../server').start({ port, quiet: true, roles: f.roles === true ? undefined : f.roles }); }
     catch (e) { die(e.code === 'EADDRINUSE' ? `port ${port} is in use by another program (try --port)` : e.message); }
-    console.log(`\n  AGENT REALM  v${pkg.version}\n  Live show:  ${urlOf(port)}${f.demo ? '  (demo cast)' : ''}\n  Events in:  POST ${urlOf(port)}/event\n  Hooks:      run "agent-realm init" once to connect Claude Code\n\n  Ctrl+C to stop.\n`);
+    console.log(`\n  AGENT REALM  v${pkg.version}\n  Live show:  ${urlOf(port)}${f.demo ? '  (demo cast)' : ''}\n  Events in:  POST ${urlOf(port)}/event\n  Cast:       ${path.relative(process.cwd(), srv.rolesFile) || srv.rolesFile}
+  Hooks:      run "agent-realm init" once to connect Claude Code\n\n  Ctrl+C to stop.\n`);
     if (f.open) openUrl(url);
     const bye = () => process.exit(0); process.on('SIGINT', bye); process.on('SIGTERM', bye);
+  },
+  async roles({ f }) {
+    const { findRoles } = require('../server');
+    if (f.init) { const dest = path.join(process.cwd(), 'agent-realm.roles.json'); if (fs.existsSync(dest)) die(`${dest} already exists`); fs.copyFileSync(path.join(ROOT, 'roles.json'), dest); return console.log(`Wrote ${dest}. Edit it, then restart agent-realm (it is picked up automatically from this folder).`); }
+    const file = findRoles(f.roles === true ? undefined : f.roles), roles = JSON.parse(fs.readFileSync(file, 'utf8')).roles;
+    console.log(`Cast from ${file}\n`);
+    for (const [id, r] of Object.entries(roles)) console.log(`  ${(r.name + ', ' + (r.title || '')).padEnd(38)} ${id.padEnd(24)} home: ${r.home || '-'}`);
   },
   async hook() { require('../hook.js'); },
   async status({ f }) {

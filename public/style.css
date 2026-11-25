@@ -11,8 +11,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 #empty small{font-size:.7em;color:var(--dim)}
 #empty.hide{opacity:0}
 .ag{position:absolute;width:0;height:0}
-.nm{position:absolute;left:0;transform:translateX(-50%);top:calc(var(--u)*1px);white-space:nowrap;font-size:max(6px,calc(var(--u)*3.4px));text-shadow:1px 1px #000,-1px 1px #000,1px -1px #000,-1px -1px #000}
-.bub{position:absolute;left:0;bottom:calc(var(--u)*23px);transform:translateX(-50%);width:max-content;max-width:calc(var(--u)*80px);background:#f6ecd2;color:#2b2118;border:2px solid #2b2118;padding:calc(var(--u)*1.4px) calc(var(--u)*2px);font-size:max(6px,calc(var(--u)*3.2px));line-height:1.45;word-break:break-word;opacity:0;transition:opacity .25s}
+.nm .t{display:block;font-size:.82em;opacity:.8;text-align:center}
+.nm{text-align:center;position:absolute;left:0;transform:translateX(-50%);top:calc(var(--u)*1px);white-space:nowrap;font-size:max(6px,calc(var(--u)*3.4px));text-shadow:1px 1px #000,-1px 1px #000,1px -1px #000,-1px -1px #000}
+.bub{position:absolute;left:0;bottom:calc(var(--u)*23px);transform:translateX(-50%);width:max-content;max-width:max(120px,calc(var(--u)*80px));background:#f6ecd2;color:#2b2118;border:2px solid #2b2118;padding:calc(var(--u)*1.4px) calc(var(--u)*2px);font-size:max(6px,calc(var(--u)*3.2px));line-height:1.45;word-break:break-word;opacity:0;transition:opacity .25s}
 .bub.on{opacity:1}
 .bub.done{background:#d5f5d0}.bub.error{background:#ffd0cc}
 .bub b{display:block;font-weight:normal;font-size:.8em;color:#7a5a30}
@@ -46,3 +47,10 @@ details{color:var(--dim)}summary{cursor:pointer}
 .key{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:5px}
 .key i{display:inline-block;width:8px;height:8px;margin-right:6px}
 @media(max-width:800px){#app{flex-direction:column}#side{width:100%;max-width:none;border-left:0;border-top:4px solid var(--edge);height:40%}}
+
+.cast{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px;max-height:30vh;overflow:auto}
+.cast i{display:inline-block;width:8px;height:8px;margin-right:6px}
+.cast small{display:block;color:var(--dim);font-size:6px;line-height:1.6;margin-top:3px}
+#side{overflow:auto}
+#log{flex:none;height:22vh}
+#log .ev.report span{color:#ff9ec0}
