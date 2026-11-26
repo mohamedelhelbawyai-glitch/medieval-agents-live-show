@@ -138,10 +138,10 @@ fight him wherever he goes.
 
 | What happens | When |
 |---|---|
-| 2 outriders ride in and surround him; 3 hearts appear over his head | the Swordsman's first event of a job (send `enemies: 1..6` to choose how many) |
+| 2 outriders ride in and surround him; 3 hearts appear over his head. **Two squires** come with him (three against 4+ enemies) | the Swordsman's first event of a job (send `enemies: 1..6` and `squires: 0..4` to choose) |
 | He is **wounded** (a heart is lost and he blinks) | a tool call fails during the fix (Qwen Code and Cursor report these). The third wound is fatal |
-| He **cuts them down**, one by one, then does a victory hop and goes to present his report | the fix is done: a subagent finishing, a final `done`, or `outcome: "fixed"` |
-| He **falls**, a gravestone appears and the outriders cheer, then ride off | the fix failed: a final `error` (no tool), a failed subagent, or `outcome: "failed"` |
+| He **cuts them down**, one by one, with his squires fighting beside him, then they cheer and he goes to present his report (the squires walk with him, then disband) | the fix is done: a subagent finishing, a final `done`, or `outcome: "fixed"` |
+| He **falls**, a gravestone appears, his squires kneel and the outriders cheer, then everyone leaves | the fix failed: a final `error` (no tool), a failed subagent, or `outcome: "failed"` |
 
 A fallen Swordsman is replaced by a fresh one on the next event. Claude Code doesn't report tool failures to hooks, so there the Swordsman wins unless an agent
 reports a failure itself (see [Event format](#event-format)).
@@ -235,7 +235,7 @@ curl -X POST localhost:4747/event -H 'Content-Type: application/json' \
 Fields: `agent` (id, required), `status` (`start` | `done` | `error` | `idle`), `tool`, `text`, and optional `role` (a key from
 roles.json), `name`, `project`, `location` (castle, library, forge, barracks, market, docks, farm, tavern, arena, theatre),
 `activity: "report"` (present on the theatre stage), `hold: true` (stay on duty until a later event for the same agent), and, for a Swordsman,
-`enemies: n` (how many bugs ride in) and `outcome: "fixed" | "failed"` (he wins, or he falls).
+`enemies: n` (how many bugs ride in), `squires: n` (how many companions) and `outcome: "fixed" | "failed"` (he wins, or he falls).
 
 ## Troubleshooting
 

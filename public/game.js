@@ -34,6 +34,7 @@ const LOOKS = {
   chancellor:   { body: '#243a6b', legs: '#1a2444', belt: '#ffd23f', color: '#8fa8ff' },
   swordsman:    { body: '#7a8294', legs: '#3a3f4b', belt: '#8a5a2b', color: '#ff7b6b' },
   arsenal:      { body: '#4a5f80', legs: '#2a3550', belt: '#d9a521', color: '#9fc2ff' },
+  squire:       { body: '#9a7a4a', legs: '#4a3a2a', belt: '#c0392b', color: '#ffb090' },
 };
 // Used when a role is unknown (or roles.json is missing): the job follows the first place the agent works at.
 const LOC_JOB = { castle: 'Royal Steward', library: 'Keeper of Records', forge: 'Craftsman', barracks: 'Craftsman', market: 'Chancellor', docks: 'Keeper of the Arsenal', farm: 'Keeper of Records',
@@ -364,6 +365,12 @@ function makeSprite(look, pal, frame) {
       else if (frame === 4) { r(12, 10, 2, 1, S.body); r(13, 9, 1, 3, '#c9a227'); r(14, 10, 6, 1, '#e6e6ee'); r(14, 9, 6, 1, '#ffffff'); r(12, 11, 1, 2, '#6b4a2a'); }
       else { r(13, 5, 1, 9, '#e6e6ee'); r(12, 13, 3, 1, '#c9a227'); r(13, 14, 1, 2, '#6b4a2a'); }
       break;
+    case 'squire':
+      r(4, 2, 8, 2, '#6b4a2a'); r(4, 4, 1, 2, '#6b4a2a'); r(11, 4, 1, 2, '#6b4a2a'); r(4, 9, 8, 1, '#b99a66'); r(0, 10, 4, 5, '#8a5a2b'); r(0, 10, 4, 1, '#c9a06a'); r(1, 11, 2, 3, '#c0392b');
+      if (frame === 3) { r(12, 9, 1, 2, S.body); r(14, 2, 1, 8, '#cfd6e0'); r(13, 10, 3, 1, '#8a6a3a'); }
+      else if (frame === 4) { r(12, 10, 2, 1, S.body); r(13, 9, 1, 3, '#8a6a3a'); r(14, 10, 5, 1, '#e6e6ee'); }
+      else { r(13, 7, 1, 7, '#cfd6e0'); r(12, 13, 3, 1, '#8a6a3a'); }
+      break;
     case 'alchemist': r(4, 2, 8, 2, '#2a4a52'); r(3, 4, 10, 1, '#2a4a52'); r(5, 4, 6, 2, '#8a5a2b'); r(6, 4, 2, 2, '#9ad0ff'); r(9, 4, 2, 2, '#9ad0ff');
       r(12, 11, 3, 4, '#9a5fe0'); r(13, 9, 1, 2, '#ccc'); r(12, 11, 3, 1, '#d8b8ff'); r(4, 15, 8, 1, '#2a4a52'); break;
   }
@@ -508,14 +515,18 @@ function wound(a) {
   a.hp = (a.hp === undefined ? 3 : a.hp) - 1; a.flash = 0.7; burst(a.x, a.y - 14, '#e5484d', 8);
   if (a.hp <= 0) killSwordsman(a);
 }
+function bringSquires(a, ev, enemyCount) {
+  const n = ev.squires !== undefined ? Math.max(0, Math.min(4, +ev.squires || 0)) : (enemyCount >= 4 ? 3 : 2);
+  if (n) ensureSquires(a, n);
+}
 function swordCombat(a, ev, status, tool, outcome, alive) {
   if (a.dead) return;
   if (outcome === 'failed') return killSwordsman(a);
   if (outcome === 'fixed') { if (alive) victory(a); return; }
   const want = Math.max(0, Math.min(6, +ev.enemies || 0));
-  if (status === 'error') { if (!alive) spawnEnemies(a, 2); wound(a); return; }          // a tool failed: he is hit
-  if (alive < want) spawnEnemies(a, want - alive);
-  else if (status === 'start' && !alive) spawnEnemies(a, 2);                              // a new problem rides in
+  if (status === 'error') { if (!alive) { spawnEnemies(a, 2); bringSquires(a, ev, 2); } wound(a); return; }   // a tool failed: he is hit
+  if (alive < want) { spawnEnemies(a, want - alive); bringSquires(a, ev, want); }
+  else if (status === 'start' && !alive) { spawnEnemies(a, 2); bringSquires(a, ev, 2); }                       // a new problem rides in; his squires join him
 }
 function updateEnemies(dt, t) {
   for (let i = enemies.length - 1; i >= 0; i--) {
@@ -552,6 +563,43 @@ function drawGrave(g, t) {
   const k = t - g.t0, x = Math.round(g.x), y = Math.round(g.y); ctx.save(); ctx.globalAlpha = k > 7 ? Math.max(0, 1 - (k - 7) / 2) : 1;
   R(ctx, x - 6, y - 1, 12, 3, 'rgba(0,0,0,.3)'); R(ctx, x - 5, y - 11, 10, 11, '#8d939c'); R(ctx, x - 4, y - 12, 8, 1, '#b4bac4'); R(ctx, x - 5, y - 11, 1, 11, '#aab0b8');
   R(ctx, x - 1, y - 9, 2, 6, '#3a3f4b'); R(ctx, x - 3, y - 7, 6, 2, '#3a3f4b'); ctx.restore();
+}
+
+/* Squires: companions who walk with the Swordsman, fight beside him, cheer when he wins and mourn if he falls. */
+const squires = [];
+const squiresOf = a => squires.filter(q => q.owner === a.id && q.state !== 'leave');
+function ensureSquires(a, n) {
+  for (let k = squiresOf(a).length; k < n; k++) squires.push({ owner: a.id, idx: k, x: a.x + rand(-8, 8), y: a.y + rand(0, 6), path: [], state: 'follow', anim: Math.random() * 9, facing: a.facing || 1, moving: false, attacking: false, hitT: 0, idleSince: 0, leaveAt: 0 });
+}
+const squireOffset = q => { const side = q.idx % 2 ? 1 : -1; return [side * (18 + (q.idx >> 1) * 10), 12 + (q.idx >> 1) * 7]; };
+function updateSquires(dt, t) {
+  for (let i = squires.length - 1; i >= 0; i--) {
+    const q = squires[i], a = agents.get(q.owner);
+    q.anim += dt;
+    if (!a && q.state !== 'leave') { q.state = 'leave'; q.path = [nodePx(GATE)]; }
+    if (a && a.dead && q.state !== 'mourn' && q.state !== 'leave') { q.state = 'mourn'; q.leaveAt = t + 2.8; q.moving = false; q.attacking = false; }
+    if (q.state === 'mourn') { if (t > q.leaveAt) { q.state = 'leave'; q.path = [nodePx(GATE)]; } continue; }
+    if (q.state === 'leave') {
+      const p = q.path[0] || nodePx(GATE), dx = p[0] - q.x, dy = p[1] - q.y, d = Math.hypot(dx, dy), step = 110 * dt; q.moving = true; q.attacking = false;
+      if (d <= step) { squires.splice(i, 1); continue; }
+      q.x += dx / d * step; q.y += dy / d * step; if (Math.abs(dx) > .5) q.facing = dx > 0 ? 1 : -1; continue;
+    }
+    const foes = liveEnemies(a);
+    if (foes.length) q.idleSince = 0; else { q.idleSince = q.idleSince || t; if (t - q.idleSince > 5) { q.state = 'leave'; q.path = [nodePx(GATE)]; continue; } }   // the fight is over: disband
+    const [ox, oy] = squireOffset(q), tx = a.x + ox, ty = a.y + oy, dx = tx - q.x, dy = ty - q.y, d = Math.hypot(dx, dy), step = Math.max(110, (a.speed || 70) * 1.2) * dt;
+    q.moving = d > 3;
+    if (q.moving) { if (d <= step) { q.x = tx; q.y = ty; } else { q.x += dx / d * step; q.y += dy / d * step; } if (Math.abs(dx) > .5) q.facing = dx > 0 ? 1 : -1; }
+    // fight the nearest outrider that has reached us
+    let near = null, nd = 70; for (const e of foes) { if (e.state !== 'fight') continue; const dd = Math.hypot(e.x - q.x, e.y - q.y); if (dd < nd) { nd = dd; near = e; } }
+    q.attacking = !q.moving && !!near;
+    if (q.attacking) { q.facing = near.x >= q.x ? 1 : -1; q.hitT -= dt; if (q.hitT <= 0) { q.hitT = rand(0.35, 0.7); burst((q.x + near.x) / 2, q.y - 14, '#ffffff', 2, 0.6); } }
+  }
+}
+function drawSquire(q, t) {
+  const S = SPR * 0.85, a = agents.get(q.owner), cheering = a && a.victoryUntil && t < a.victoryUntil;
+  const frame = q.moving ? [1, 0, 2, 0][Math.floor(q.anim * 8) % 4] : q.attacking ? 3 + (Math.floor(q.anim * 6) % 2) : 0, spr = getSprite({ look: 'squire', pal: {} }, frame);
+  const kneel = q.state === 'mourn', bob = cheering && !q.moving ? (Math.floor(q.anim * 5) % 2 ? -3 : 0) : 0;
+  ctx.save(); ctx.translate(Math.round(q.x), Math.round(q.y + bob)); ctx.scale(q.facing < 0 ? -S : S, kneel ? S * 0.78 : S); ctx.drawImage(spr, -10, -21); ctx.restore();
 }
 
 function emit(ev) {
@@ -673,8 +721,8 @@ function frame(ms) {
   const list = [...agents.values()];
   fightOn = list.some(o => o.loc === 'arena' && o.state === 'working'); showOn = list.some(o => o.loc === 'theatre' && o.state === 'working');
   for (const a of list) updateAgent(a, dt, t);
-  updateEnemies(dt, t);
-  const items = list.map(a => ({ y: a.y, d: () => drawAgent(a) })).concat(enemies.filter(e => !(e.wait > 0)).map(e => ({ y: e.y, d: () => drawEnemy(e) })), graves.map(g => ({ y: g.y, d: () => drawGrave(g, t) })));
+  updateEnemies(dt, t); updateSquires(dt, t);
+  const items = list.map(a => ({ y: a.y, d: () => drawAgent(a) })).concat(squires.map(q => ({ y: q.y, d: () => drawSquire(q, t) })), enemies.filter(e => !(e.wait > 0)).map(e => ({ y: e.y, d: () => drawEnemy(e) })), graves.map(g => ({ y: g.y, d: () => drawGrave(g, t) })));
   items.sort((p, q) => p.y - q.y);
   for (const it of items) it.d();
   // particles
