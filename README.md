@@ -117,6 +117,60 @@ role name matches a job takes that job**, even one the town has never seen. The 
 Roles that match no job still appear: the job follows the first place the agent works at (a shell command makes it a Craftsman, a test run a Guild Inspector...)
 and its role name becomes the second line.
 
+### Role → character mapping
+
+Every agent has a **role id**: the subagent name in Claude Code, the agent type in Codex, Qwen Code and Cursor, or the `role` field of an event.
+The town picks the character in this order: **1)** a pinned role below, **2)** a job named directly (`Swordsman`, `Guild Inspector`...),
+**3)** the first job whose keywords appear in the role id, **4)** otherwise a job based on the first place the agent works at.
+
+**Pinned roles** (the default `roles.json`):
+
+| Role id (agent name) | Character | Specialty | Look | Stands at |
+|---|---|---|---|---|
+| `orchestrator` | **Royal Steward** | Conductor | steward | castle |
+| `task-planner` | **Royal Steward** | Tasks | steward | castle |
+| `intake-auditor` | **Chancellor** | Intake | chancellor | castle |
+| `business-analyst` | **Chancellor** | Requirements | chancellor | castle |
+| `spec-author` | **Chancellor** | Specs | chancellor | castle |
+| `spec-reviewer` | **Chancellor** | Spec review | chancellor | castle |
+| `coverage-reviewer` | **Chancellor** | Coverage | chancellor | castle |
+| `feature-architect` | **Master Craftsmen** | Architecture | master | library |
+| `plan-reviewer` | **Master Craftsmen** | Plan review | master | library |
+| `code-reviewer` | **Master Craftsmen** | Code review | master | library |
+| `flutter-expert` | **Craftsman** | Flutter | worker | forge |
+| `kotlin-specialist` | **Craftsman** | Kotlin | worker | forge |
+| `node-specialist` | **Craftsman** | Node | worker | forge |
+| `sql-pro` | **Craftsman** | SQL | worker | forge |
+| `qa-verifier` | **Guild Inspector** | QA | inquisitor | arena |
+| `test-scenario-designer` | **Guild Inspector** | Scenarios | inquisitor | arena |
+| `performance-engineer` | **Guild Inspector** | Performance | inquisitor | arena |
+| `final-auditor` | **Guild Inspector** | Final audit | inquisitor | arena |
+| `debugger` | **Swordsman** | Debugging | swordsman | barracks |
+| `bug-fixer` | **Swordsman** | Bug fixing | swordsman | barracks |
+| `release-engineer` | **Keeper of the Arsenal** | Release | arsenal | docks |
+| `reporter` | **Royal Scribe** | Reports | scribe | library |
+| `context-engineer` | **Keeper of Records** | Context | archivist | farm |
+
+**Keywords** (step 3, case-insensitive; the first matching job wins, in this order):
+
+| Job | Any role name containing |
+|---|---|
+| **Swordsman** | `debug`, `bug`, `fix, fixer`, `hotfix`, `incident`, `troubleshoot`, `triage`, `issue`, `regression`, `firefight` |
+| **Keeper of the Arsenal** | `deploy`, `release`, `devops`, `ci, cd`, `ship`, `publish`, `infra`, `sre`, `rollout`, `pipeline` |
+| **Royal Scribe** | `report`, `scribe`, `summar`, `changelog`, `release-notes`, `status-update` |
+| **Keeper of Records** | `context`, `record`, `memory`, `docs`, `documentation`, `knowledge`, `markdown`, `archiv`, `notes` |
+| **Chancellor** | `analyst`, `business`, `requirement`, `clarif`, `intake`, `specs`, `specification`, `product`, `stakeholder`, `ba`, `explor`, `research`, `investigat`, `discovery`, `user-stor` |
+| **Guild Inspector** | `qa`, `quality`, `test`, `verif`, `inspect`, `audit`, `validat`, `acceptance`, `benchmark`, `perf` |
+| **Master Craftsmen** | `code-review`, `review`, `architect`, `design`, `senior`, `lint` |
+| **Royal Steward** | `orchestrat`, `conduct`, `coordinat`, `manager`, `lead`, `planner`, `steward`, `supervis`, `main` |
+| **Craftsman** | `dev`, `develop`, `engineer`, `coder`, `programm`, `implement`, `build`, `specialist`, `expert`, `frontend`, `backend`, `fullstack`, `mobile`, `flutter`, `kotlin`, `swift`, `android`, `ios`, `node`, `python`, `java`, `react`, `sql`, `golang`, `rust`, `web`, `general`, `worker` |
+
+Short keywords (`ba`, `ci`, `cd`, `qa`, `sre`, `dev`, `lead`, `main`, `sql`, `web`, `spec`, `bug`, `issue`...) only count as a whole word in the role id (split at `-`), so `database-specialist` is a Craftsman, not a Chancellor.
+
+So `mobile-developer` and `go-engineer` become Craftsmen, `security-code-reviewer` a Master Craftsmen, `e2e-tester` a Guild Inspector,
+`product-owner` a Chancellor, `hotfix-agent` a Swordsman, `deploy-bot` a Keeper of the Arsenal, `status-reporter` a Royal Scribe,
+`docs-writer` a Keeper of Records and `team-lead` a Royal Steward. These keywords are checked by the test suite (`npm test`).
+
 **Your own cast.** `agent-realm roles --init` writes `agent-realm.roles.json` here (picked up automatically), or use `agent-realm start --roles my.json`.
 The file has two parts:
 

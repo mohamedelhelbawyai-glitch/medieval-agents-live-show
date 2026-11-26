@@ -17,7 +17,7 @@ test('pinned roles map to the requested jobs', () => {
 });
 test('any role matching a job by name takes that job', () => {
   for (const [id, want] of [
-    ['mobile-developer', 'Craftsman'], ['react-frontend-engineer', 'Craftsman'], ['golang-specialist', 'Craftsman'],
+    ['mobile-developer', 'Craftsman'], ['go-engineer', 'Craftsman'], ['react-frontend-engineer', 'Craftsman'], ['golang-specialist', 'Craftsman'],
     ['security-code-reviewer', 'Master Craftsmen'], ['design-reviewer', 'Master Craftsmen'],
     ['e2e-tester', 'Guild Inspector'], ['quality-checker', 'Guild Inspector'],
     ['business-analyst', 'Chancellor'], ['requirements-gatherer', 'Chancellor'], ['clarifier', 'Chancellor'], ['product-owner', 'Chancellor'],
@@ -47,4 +47,9 @@ test('a resolved role carries look, home and specialty', () => {
 test('older role files (named characters) still resolve', () => {
   const old = { roles: { 'code-reviewer': { name: 'Sir Cedric', title: 'the Just', look: 'knight', home: 'library' } } };
   const r = resolveRole(old, 'code-reviewer'); assert.deepStrictEqual([r.job, r.look], ['the Just', 'knight']);
+});
+test('the README documents every pinned role and job', () => {
+  const readme = require('fs').readFileSync(require('path').join(__dirname, '..', 'README.md'), 'utf8');
+  for (const id of Object.keys(cfg.roles)) assert.ok(readme.includes('`' + id + '`'), 'README is missing role ' + id);
+  for (const j of Object.keys(cfg.jobs)) assert.ok(readme.includes('**' + j + '**'), 'README is missing job ' + j);
 });
