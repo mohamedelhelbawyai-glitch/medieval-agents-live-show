@@ -64,3 +64,8 @@ test('events never contain file contents or prompts', () => {
   const e = adapt('claude', { hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: { file_path: '/a/b.txt', content: marker }, prompt: marker, session_id: 's' }).events[0];
   assert.ok(!JSON.stringify(e).includes(marker));
 });
+test('a failed subagent is a final failure (no tool), so the Swordsman falls', () => {
+  const e = adapt('cursor', { hook_event_name: 'subagentStop', subagent_type: 'debugger', status: 'error', conversation_id: 'conv-0123456789' }).events[0];
+  assert.deepStrictEqual([e.status, e.tool, e.hold, e.role], ['error', undefined, false, 'debugger']);
+  assert.strictEqual(adapt('cursor', { hook_event_name: 'subagentStop', subagent_type: 'debugger', status: 'completed', conversation_id: 'c' }).events[0].activity, 'report');
+});

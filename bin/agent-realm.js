@@ -166,34 +166,12 @@ const commands = {
   async roles({ f }) {
     const { findRoles } = require('../server');
     if (f.init) { const dest = path.join(process.cwd(), 'agent-realm.roles.json'); if (fs.existsSync(dest)) die(`${dest} already exists`); fs.copyFileSync(path.join(ROOT, 'roles.json'), dest); return console.log(`Wrote ${dest}. Edit it, then restart agent-realm (it is picked up automatically from this folder).`); }
-    const file = findRoles(f.roles === true ? undefined : f.roles), roles = JSON.parse(fs.readFileSync(file, 'utf8')).roles;
+    const file = findRoles(f.roles === true ? undefined : f.roles), cfg = JSON.parse(fs.readFileSync(file, 'utf8')), { resolveRole } = require('../public/jobs');
     console.log(`Cast from ${file}\n`);
-    for (const [id, r] of Object.entries(roles)) console.log(`  ${(r.name + ', ' + (r.title || '')).padEnd(38)} ${id.padEnd(24)} home: ${r.home || '-'}`);
-  },
-  async update({ f }) {
-    const slug = upd.repoSlug(); if (!slug) die('this copy does not know its GitHub repository (package.json "repository")');
-    const state = upd.readState(), kind = upd.installKind();
-    process.stdout.write(`${bold('agent-realm')} v${pkg.version}  ${dim('checking github.com/' + slug + ' ...')}\n`);
-    let l; try { l = await upd.latest(slug); } catch (e) { die(`could not check for updates: ${e.message}`); }
-    const known = state.sha, same = known === l.sha;
-    console.log(`  latest   ${l.short}${l.version ? ' (v' + l.version + ')' : ''}  ${dim(l.message)}`);
-    console.log(`  yours    ${known ? known.slice(0, 7) : dim('unknown (installed before update tracking)')}  v${pkg.version}`);
-    if (f.check) { console.log(same ? green('\nUp to date.') : '\n' + (known ? yellow('A newer version is available.') : yellow('Cannot tell if you are current.')) + ' Run: agent-realm update'); process.exitCode = same ? 0 : 2; return; }
-    if (same && !f.force) { console.log(green('\nAlready up to date.')); return; }
-    if (kind === 'clone') { console.log(yellow(`\nThis copy runs from a git clone (${ROOT}).\nUpdate it with:  git -C "${ROOT}" pull   ${dim('(then npm install -g . if you installed it globally)')}`)); return; }
-    if (kind === 'npx') { console.log(yellow('\nThis copy runs from a temporary npx cache; npx fetches the latest on each run. For a permanent install:\n  npm install -g github:' + slug)); return; }
-    console.log(`\n${bold('Updating')} ${dim('npm install -g github:' + slug)}\n`);
-    const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    const r = cp.spawnSync(npm, ['install', '-g', `github:${slug}`], { stdio: 'inherit' });
-    if (r.status !== 0) { console.error(red('\nUpdate failed.') + ' If you saw a permissions error, fix your npm prefix or run with the permissions you used to install.'); process.exit(1); }
-    upd.writeState({ sha: l.sha, version: l.version, updatedAt: new Date().toISOString() });
-    console.log(green(`\n✔ Updated to ${l.short}${l.version ? ' (v' + l.version + ')' : ''}.`));
-    const hooked = agents.IDS.filter(i => agents.status(i).hooks.user > 0);
-    if (f.hooks && hooked.length) {
-      console.log(`\nRefreshing hooks for ${hooked.map(i => agents.AGENTS[i].label).join(', ')} ...`);
-      cp.spawnSync(process.execPath, [path.join(ROOT, 'bin', 'agent-realm.js'), 'hooks', 'install', '--agent', hooked.join(','), '--yes'], { stdio: 'inherit' });   // same path, now the new code
-    } else if (hooked.length) console.log(dim('  Hooks call "agent-realm hook", so they already use the new version. To pick up any new hook events, run: agent-realm update --hooks'));
-    console.log(dim('  Restart a running show (Ctrl+C, then agent-realm) to load the new version.'));
+    console.log(bold('Jobs') + dim('  (any agent whose role id matches a job\'s patterns takes that job)'));
+    for (const [job, j] of Object.entries(cfg.jobs || {})) console.log(`  ${job.padEnd(24)} look: ${String(j.look).padEnd(11)} home: ${String(j.home || '-').padEnd(9)} ${dim((j.match || []).length + ' patterns')}`);
+    console.log('\n' + bold('Pinned roles'));
+    for (const id of Object.keys(cfg.roles || {})) { const r = resolveRole(cfg, id); console.log(`  ${id.padEnd(24)} ${r.job}${r.specialty ? ' · ' + r.specialty : ''}`); }
   },
   async hook() { require('../hook.js'); },
   async init({ f }) { await setup(f, { docs: true }); },

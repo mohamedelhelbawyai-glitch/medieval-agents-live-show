@@ -30,11 +30,17 @@ const LOOKS = {
   jester:       { body: '#c0394b', legs: '#2f5fb8', belt: '#ffd23f', color: '#ff8fa0' },
   plaguedoctor: { body: '#2a2a2e', legs: '#1e1e22', belt: '#8a5a2b', color: '#9ad0b0' },
   alchemist:    { body: '#2f7a86', legs: '#2a4a52', belt: '#8a5a2b', color: '#7fe0d0' },
+  master:       { body: '#5a3d2a', legs: '#3a2a1e', belt: '#d9a521', color: '#7fd8a0' },
+  chancellor:   { body: '#243a6b', legs: '#1a2444', belt: '#ffd23f', color: '#8fa8ff' },
+  swordsman:    { body: '#7a8294', legs: '#3a3f4b', belt: '#8a5a2b', color: '#ff7b6b' },
+  arsenal:      { body: '#4a5f80', legs: '#2a3550', belt: '#d9a521', color: '#9fc2ff' },
 };
-const LOC_LOOK = { castle: 'governor', library: 'scribe', forge: 'worker', barracks: 'knight', market: 'merchant', docks: 'trader', farm: 'farmer', tavern: 'bard', arena: 'knight', stands: 'bard', theatre: 'bard', audience: 'bard' };
-const FIRST = ['Aldric','Brenna','Cedric','Dagny','Edmund','Freya','Gareth','Hild','Ivo','Jorah','Kenna','Leofric','Mira','Nedd','Osric','Petra','Rolf','Sybil','Tobias','Ulric','Wulf','Yara','Edda','Bran'];
-const fallbackName = (id, look) => { const f = FIRST[hash(id) % FIRST.length]; return look === 'governor' ? 'Lord ' + f : look === 'knight' ? 'Sir ' + f : f; };
-let ROLEDEF = {};   // role id -> {name,title,look,body,accent,home,tasks}
+// Used when a role is unknown (or roles.json is missing): the job follows the first place the agent works at.
+const LOC_JOB = { castle: 'Royal Steward', library: 'Keeper of Records', forge: 'Craftsman', barracks: 'Craftsman', market: 'Chancellor', docks: 'Keeper of the Arsenal', farm: 'Keeper of Records',
+  tavern: 'Royal Scribe', arena: 'Guild Inspector', stands: 'Royal Scribe', theatre: 'Royal Scribe', audience: 'Royal Scribe' };
+const JOB_LOOK = { 'Craftsman': 'worker', 'Master Craftsmen': 'master', 'Guild Inspector': 'inquisitor', 'Chancellor': 'chancellor', 'Swordsman': 'swordsman', 'Royal Steward': 'steward',
+  'Keeper of the Arsenal': 'arsenal', 'Royal Scribe': 'scribe', 'Keeper of Records': 'archivist' };
+let ROLECFG = { jobs: {}, roles: {} };   // from roles.json: jobs (look, home, name patterns) and pinned roles
 
 /* ---------------------------------------------------------------- map data */
 const ROADS = [   // drawn as dirt roads and walkable
@@ -346,13 +352,47 @@ function makeSprite(look, pal, frame) {
     case 'jester': r(8, 9, 4, 7, acc || '#2f5fb8'); r(2, 2, 4, 2, '#c0392b'); r(1, 0, 2, 3, '#c0392b'); r(10, 2, 4, 2, acc || '#2f5fb8'); r(12, 0, 2, 3, acc || '#2f5fb8'); r(5, 3, 6, 1, '#ffd23f'); r(1, 0, 1, 1, '#ffd23f'); r(13, 0, 1, 1, '#ffd23f');
       r(13, 6, 1, 10, '#6b4a2a'); r(12, 4, 3, 3, '#ffd23f'); r(13, 5, 1, 1, '#c0392b'); break;
     case 'plaguedoctor': r(2, 3, 12, 1, '#1a1a1a'); r(4, 1, 8, 2, '#1a1a1a'); r(5, 3, 6, 5, '#cdbd9a'); r(10, 5, 4, 2, '#cdbd9a'); r(13, 6, 1, 1, '#a89a78'); r(6, 4, 2, 2, '#bfe8ff'); r(4, 15, 8, 2, S.body); r(13, 3, 1, 14, '#6b4a2a'); r(12, 3, 3, 1, '#c9a227'); break;
+    case 'master': r(3, 2, 10, 2, '#2f4a3a'); r(5, 1, 6, 1, '#2f4a3a'); r(3, 4, 10, 1, '#d9a521'); r(5, 11, 6, 5, '#2f6a3f'); r(5, 9, 1, 3, '#2f6a3f'); r(10, 9, 1, 3, '#2f6a3f');
+      r(13, 10, 1, 5, '#6b4a2a'); r(12, 7, 4, 4, '#d9a521'); r(13, 8, 2, 2, '#bfe8ff'); r(11, 13, 2, 2, '#d9a521'); break;
+    case 'chancellor': r(4, 1, 8, 3, '#1a2a50'); r(3, 4, 10, 1, '#1a2a50'); r(4, 3, 8, 1, '#ffd23f'); r(7, 2, 2, 1, '#c0392b'); r(5, 9, 6, 1, '#ffd23f'); r(6, 10, 4, 1, '#ffd23f'); r(7, 11, 2, 2, '#ffd23f');
+      r(4, 15, 8, 1, '#ffd23f'); r(12, 10, 4, 4, '#f0e6c8'); r(12, 10, 4, 1, '#c9a227'); r(12, 13, 4, 1, '#c9a227'); r(14, 12, 1, 1, '#c0392b'); break;
+    case 'arsenal': r(4, 1, 8, 3, '#8d939c'); r(4, 1, 8, 1, '#c9ccd6'); r(4, 4, 1, 3, '#8d939c'); r(11, 4, 1, 3, '#8d939c'); r(7, 0, 2, 1, '#c0392b'); r(5, 9, 6, 6, '#2f4a6e'); r(7, 10, 2, 4, '#c9ccd6'); r(6, 11, 4, 2, '#c9ccd6');
+      r(13, 1, 1, 17, '#6b4a2a'); r(12, 0, 3, 3, '#c9ccd6'); r(11, 3, 5, 1, '#c9ccd6'); r(10, 13, 2, 3, '#d9a521'); r(0, 11, 4, 5, '#6b4a2a'); r(0, 11, 4, 1, '#a8763a'); r(1, 13, 2, 1, '#d9a521'); break;
+    case 'swordsman':
+      r(4, 2, 8, 3, '#9aa4b4'); r(4, 2, 8, 1, '#cfd6e0'); r(4, 5, 1, 2, '#9aa4b4'); r(11, 5, 1, 2, '#9aa4b4'); r(7, 5, 2, 2, '#9aa4b4'); r(4, 8, 8, 1, '#c0392b'); r(11, 8, 1, 3, '#c0392b'); r(5, 10, 6, 1, '#4a3520'); r(5, 12, 6, 1, '#4a3520');
+      if (frame === 3) { r(12, 9, 1, 2, S.body); r(14, 0, 1, 9, '#e6e6ee'); r(14, 0, 1, 2, '#ffffff'); r(12, 9, 5, 1, '#c9a227'); r(14, 10, 1, 2, '#6b4a2a'); }
+      else if (frame === 4) { r(12, 10, 2, 1, S.body); r(13, 9, 1, 3, '#c9a227'); r(14, 10, 6, 1, '#e6e6ee'); r(14, 9, 6, 1, '#ffffff'); r(12, 11, 1, 2, '#6b4a2a'); }
+      else { r(13, 5, 1, 9, '#e6e6ee'); r(12, 13, 3, 1, '#c9a227'); r(13, 14, 1, 2, '#6b4a2a'); }
+      break;
     case 'alchemist': r(4, 2, 8, 2, '#2a4a52'); r(3, 4, 10, 1, '#2a4a52'); r(5, 4, 6, 2, '#8a5a2b'); r(6, 4, 2, 2, '#9ad0ff'); r(9, 4, 2, 2, '#9ad0ff');
       r(12, 11, 3, 4, '#9a5fe0'); r(13, 9, 1, 2, '#ccc'); r(12, 11, 3, 1, '#d8b8ff'); r(4, 15, 8, 1, '#2a4a52'); break;
   }
-  const id = g.getImageData(0, 0, 20, 24), d = id.data, A = (x, y) => (x < 0 || y < 0 || x > 19 || y > 23) ? 0 : d[(y * 20 + x) * 4 + 3];
-  g.fillStyle = '#1a120b';
-  for (let y = 0; y < 24; y++) for (let x = 0; x < 20; x++) if (A(x, y) < 200 && (A(x - 1, y) >= 200 || A(x + 1, y) >= 200 || A(x, y - 1) >= 200 || A(x, y + 1) >= 200)) g.fillRect(x, y, 1, 1);
+  outline(g, 20, 24);
   return c;
+}
+function outline(g, w, h) {   // dark 1px outline around every solid pixel
+  const d = g.getImageData(0, 0, w, h).data, A = (x, y) => (x < 0 || y < 0 || x >= w || y >= h) ? 0 : d[(y * w + x) * 4 + 3];
+  g.fillStyle = '#1a120b';
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (A(x, y) < 200 && (A(x - 1, y) >= 200 || A(x + 1, y) >= 200 || A(x, y - 1) >= 200 || A(x, y + 1) >= 200)) g.fillRect(x, y, 1, 1);
+}
+// The enemy: an outrider (a mounted scout with bug antennae and red eyes). Feet at y = 23.
+const enemySprites = {};
+function getEnemySprite(frame) {
+  if (enemySprites[frame]) return enemySprites[frame];
+  const c = document.createElement('canvas'); c.width = 32; c.height = 26; const g = c.getContext('2d');
+  const r = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x + 2, y + 2, w, h); };
+  const lift = frame ? 1 : 0;
+  r(3, 20, 22, 3, 'rgba(0,0,0,.28)');
+  r(3, 9, 3, 5, '#2a1d12');                                                   // tail
+  r(5, 10, 16, 7, '#5a4632'); r(5, 10, 16, 2, '#6e583f'); r(5, 15, 16, 2, '#4a3a28');   // body
+  r(6, 17, 2, 4 - lift, '#3d2f20'); r(10, 17, 2, 3 + lift, '#3d2f20'); r(15, 17, 2, 4 - lift, '#3d2f20'); r(19, 17, 2, 3 + lift, '#3d2f20');   // gallop
+  r(19, 5, 4, 7, '#5a4632'); r(21, 4, 5, 4, '#5a4632'); r(25, 5, 1, 1, '#ff3b3b'); r(18, 4, 2, 7, '#2a1d12');     // neck, head, eye, mane
+  r(9, 2, 6, 9, '#3a2a4a'); r(9, 2, 6, 1, '#5a4470'); r(9, 10, 6, 1, '#2a1d38');                                 // rider's cloak
+  r(10, -1, 4, 4, '#7fa05a'); r(11, 0, 1, 1, '#ff3b3b'); r(13, 0, 1, 1, '#ff3b3b');                              // goblin face, red eyes
+  r(10, -3, 1, 2, '#1a120b'); r(13, -3, 1, 2, '#1a120b');                                                         // antennae: it is a bug
+  r(16, 1, 1, 11, '#6b4a2a'); r(17, 1, 5, 3, '#c0392b'); r(17, 3, 3, 1, '#8a2430');                              // lance and red pennant
+  outline(g, 32, 26);
+  return (enemySprites[frame] = c);
 }
 function getSprite(a, frame) { const k = a.look + (a.pal.body || '') + (a.pal.accent || '') + frame; return sprites[k] || (sprites[k] = makeSprite(a.look, a.pal, frame)); }
 
@@ -385,11 +425,14 @@ function pickRest() {
 }
 
 function spawn(id, ev, loc) {
-  const rid = String(ev.role || '').slice(0, 40), def = ROLEDEF[rid];
+  const rid = String(ev.role || '').slice(0, 40), res = rid ? RealmJobs.resolveRole(ROLECFG, rid) : null;
   let look, pal, name, title, home = null;
-  if (def) { look = LOOKS[def.look] ? def.look : 'knight'; pal = { body: def.body, accent: def.accent }; name = def.name; title = def.title || ''; home = def.home; }
-  else { look = LOOKS[rid] ? rid : (LOC_LOOK[loc] || 'merchant'); pal = {}; name = fallbackName(id, look); title = ''; }
-  if (ev.name) name = String(ev.name).slice(0, 24);
+  if (res && res.look) { look = LOOKS[res.look] ? res.look : 'worker'; pal = { body: res.body, accent: res.accent }; name = res.job || LOC_JOB[loc]; title = res.specialty || ''; home = res.home; }
+  else {   // unknown role: the job follows the first place it works at; the role id becomes the second line
+    const job = LOC_JOB[loc] || 'Craftsman', jl = (ROLECFG.jobs[job] && ROLECFG.jobs[job].look) || JOB_LOOK[job];
+    look = LOOKS[jl] ? jl : 'worker'; pal = {}; name = job; title = rid.slice(0, 18);
+  }
+  if (ev.name) name = String(ev.name).slice(0, 24);        // an explicit name (REALM_NAME) still wins
   if (rid === 'orchestrator' && ev.project) title = String(ev.project).slice(0, 20);
   const color = LOOKS[look].color;
   const el = document.createElement('div'); el.className = 'ag';
@@ -399,7 +442,7 @@ function spawn(id, ev, loc) {
   const bub = document.createElement('div'); bub.className = 'bub';
   el.append(bub, nm); overlay.append(el);
   const [x, y] = nodePx(GATE);
-  const a = { id, rid, look, pal, color, name, title, home, x, y, path: [], node: GATE, loc: null, slot: null, state: 'idle', busy: false, busyUntil: 0, hold: false, holdUntil: 0, facing: 1,
+  const a = { id, rid, look, pal, color, name, title, home, hp: 3, flash: 0, x, y, path: [], node: GATE, loc: null, slot: null, state: 'idle', busy: false, busyUntil: 0, hold: false, holdUntil: 0, facing: 1,
     anim: Math.random() * 9, lastEvent: now(), status: 'idle', text: '', task: '', tool: '', taskStart: 0, el, bub, bubUntil: 0, partT: 0, leaving: false };
   agents.set(id, a); return a;
 }
@@ -431,29 +474,117 @@ function say(a, text, status, secs, label) {
 
 function burst(x, y, col, n, spread = 1) { for (let i = 0; i < n; i++) particles.push({ x, y, vx: rand(-20, 20) * spread, vy: rand(-45, -15), life: 0, max: rand(.5, 1.1), col, s: Math.random() < .3 ? 2 : 1, g: 70 }); }
 
+/* ---------------------------------------------------------------- the Swordsman and his enemies
+   Bugs, issues and mistakes ride in as outriders. While the Swordsman works on a fix they fight him.
+   Fixed (a report, a final "done", or outcome:"fixed")  -> the Swordsman cuts them down, one by one.
+   Failed (a final "error", or outcome:"failed")         -> the Swordsman falls and the outriders ride off.
+   A failing tool call mid-fix only wounds him (3 hearts); the third wound is fatal. */
+const enemies = [], graves = [];
+const enemiesOf = a => enemies.filter(e => e.owner === a.id);
+const liveEnemies = a => enemies.filter(e => e.owner === a.id && (e.state === 'ride' || e.state === 'fight') && !e.doomAt);
+function spawnEnemies(a, n) {
+  const have = liveEnemies(a).length, target = a.path.length ? a.path[a.path.length - 1] : [a.x, a.y];
+  for (let k = 0; k < n; k++) {
+    const i = have + k, side = i % 2 ? 1 : -1, [gx, gy] = nodePx(GATE);
+    const e = { owner: a.id, x: gx + rand(-14, 14), y: gy, path: [], state: 'ride', anim: Math.random() * 9, facing: 1, wait: k * 0.45, dx: side * (30 + (i >> 1) * 22), dy: ((i % 3) - 1) * 5, hitT: 0, doomAt: 0, dieT: 0, cheerUntil: 0 };
+    for (const key of bfs(GATE, a.node).slice(1)) e.path.push(nodePx(key));      // gallop up the roads from the south gate
+    e.path.push([target[0] + e.dx, target[1] + e.dy]);
+    enemies.push(e);
+  }
+}
+function retreat(a) { for (const e of liveEnemies(a)) { e.state = 'flee'; e.path = [nodePx(GATE)]; } }
+function victory(a) {
+  const t = now(), list = liveEnemies(a);
+  list.forEach((e, i) => { e.doomAt = t + 0.6 + i * 0.5; });
+  a.victoryUntil = t + 0.6 + list.length * 0.5 + 2.2; a.hp = 3;
+}
+function killSwordsman(a) {
+  const t = now(); a.dead = true; a.deadT = 0; a.path = []; a.hold = false; a.busy = false; a.state = 'dead';
+  burst(a.x, a.y - 14, '#e5484d', 16);
+  for (const e of liveEnemies(a)) { e.state = 'cheer'; e.path = []; e.cheerUntil = t + 2.4; }
+  graves.push({ x: a.x, y: a.y, t0: t + 1 });
+}
+function wound(a) {
+  a.hp = (a.hp === undefined ? 3 : a.hp) - 1; a.flash = 0.7; burst(a.x, a.y - 14, '#e5484d', 8);
+  if (a.hp <= 0) killSwordsman(a);
+}
+function swordCombat(a, ev, status, tool, outcome, alive) {
+  if (a.dead) return;
+  if (outcome === 'failed') return killSwordsman(a);
+  if (outcome === 'fixed') { if (alive) victory(a); return; }
+  const want = Math.max(0, Math.min(6, +ev.enemies || 0));
+  if (status === 'error') { if (!alive) spawnEnemies(a, 2); wound(a); return; }          // a tool failed: he is hit
+  if (alive < want) spawnEnemies(a, want - alive);
+  else if (status === 'start' && !alive) spawnEnemies(a, 2);                              // a new problem rides in
+}
+function updateEnemies(dt, t) {
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i], a = agents.get(e.owner);
+    e.anim += dt;
+    if (e.state === 'dying') { e.dieT += dt; if (e.dieT > 0.9) enemies.splice(i, 1); continue; }
+    if (!a && e.state !== 'flee') { e.state = 'flee'; e.path = [nodePx(GATE)]; }
+    if (e.doomAt && t >= e.doomAt) { e.state = 'dying'; e.dieT = 0; burst(e.x, e.y - 10, '#c0394b', 10); burst(e.x, e.y - 6, '#9aa', 6); continue; }
+    if (e.wait > 0) { e.wait -= dt; continue; }
+    if (e.state === 'cheer') { if (t > e.cheerUntil) { e.state = 'flee'; e.path = [nodePx(GATE)]; } continue; }
+    if (e.path.length) {
+      const p = e.path[0], dx = p[0] - e.x, dy = p[1] - e.y, d = Math.hypot(dx, dy), step = (e.state === 'flee' ? 170 : 130) * dt;
+      if (d <= step) { e.x = p[0]; e.y = p[1]; e.path.shift(); if (!e.path.length) { if (e.state === 'flee') { enemies.splice(i, 1); continue; } e.state = 'fight'; } }
+      else { e.x += dx / d * step; e.y += dy / d * step; if (Math.abs(dx) > .5) e.facing = dx > 0 ? 1 : -1; }
+    } else if (e.state === 'fight' && a) {
+      const tx = a.x + e.dx, ty = a.y + e.dy, d = Math.hypot(tx - e.x, ty - e.y);
+      if (d > 38) { e.path = [[tx, ty]]; e.state = 'ride'; }                                   // he moved on: chase him
+      else { e.x += (tx - e.x) * Math.min(1, dt * 6); e.y += (ty - e.y) * Math.min(1, dt * 6); }
+      e.facing = a.x >= e.x ? 1 : -1;
+      e.hitT -= dt; if (e.hitT <= 0 && !a.dead) { e.hitT = rand(0.3, 0.6); burst((a.x + e.x) / 2, a.y - 16, '#ffffff', 3, 0.6); burst((a.x + e.x) / 2, a.y - 16, '#ffd23f', 1, 0.6); }
+    }
+  }
+  for (let i = graves.length - 1; i >= 0; i--) if (t - graves[i].t0 > 9) graves.splice(i, 1);
+}
+function drawEnemy(e) {
+  const S = SPR * 0.95, spr = getEnemySprite(e.state === 'ride' || e.state === 'flee' ? Math.floor(e.anim * 9) % 2 : Math.floor(e.anim * 5) % 2);
+  let bob = e.state === 'cheer' ? (Math.floor(e.anim * 6) % 2 ? -3 : 0) : 0;
+  ctx.save(); ctx.translate(Math.round(e.x), Math.round(e.y + bob));
+  if (e.state === 'dying') { const k = e.dieT / 0.9; ctx.rotate(-e.facing * k * 1.45); ctx.globalAlpha = k > 0.55 ? 1 - (k - 0.55) / 0.45 : 1; }
+  ctx.scale(e.facing < 0 ? -S : S, S); ctx.drawImage(spr, -16, -23); ctx.restore();
+}
+function drawGrave(g, t) {
+  if (t < g.t0) return;
+  const k = t - g.t0, x = Math.round(g.x), y = Math.round(g.y); ctx.save(); ctx.globalAlpha = k > 7 ? Math.max(0, 1 - (k - 7) / 2) : 1;
+  R(ctx, x - 6, y - 1, 12, 3, 'rgba(0,0,0,.3)'); R(ctx, x - 5, y - 11, 10, 11, '#8d939c'); R(ctx, x - 4, y - 12, 8, 1, '#b4bac4'); R(ctx, x - 5, y - 11, 1, 11, '#aab0b8');
+  R(ctx, x - 1, y - 9, 2, 6, '#3a3f4b'); R(ctx, x - 3, y - 7, 6, 2, '#3a3f4b'); ctx.restore();
+}
+
 function emit(ev) {
   if (!ev || typeof ev !== 'object') return;
   const id = String(ev.agent || 'unknown').slice(0, 40);
   const status = ['start', 'done', 'error', 'idle'].includes(ev.status) ? ev.status : 'start';
   const tool = String(ev.tool || '').slice(0, 60), text = String(ev.text || tool || '...').slice(0, 120);
-  const report = ev.activity === 'report', def = ROLEDEF[String(ev.role || '')];
+  const report = ev.activity === 'report', def = ev.role ? RealmJobs.resolveRole(ROLECFG, String(ev.role)) : null;
   let loc = LOC[ev.location] ? ev.location : null;
   if (!loc) loc = report ? 'theatre' : status === 'idle' ? pickRest() : (toolLoc(tool, text) || (def && def.home) || 'castle');
-  const a = agents.get(id) || spawn(id, ev, loc);
+  let a = agents.get(id);
+  if (a && a.dead) { a.el.remove(); agents.delete(id); a = null; }               // a fallen Swordsman is replaced by a fresh one
+  a = a || spawn(id, ev, loc);
   const t = now();
   a.lastEvent = t; a.status = status; a.text = text;
   if (status === 'start' && (a.task !== text || !a.taskStart || !isRunning(a))) { a.task = text; a.taskStart = t; a.tool = tool; }
   if (ev.hold === true) { a.hold = true; } else if (ev.hold === false || status === 'idle') a.hold = false;
   if (a.hold) a.holdUntil = t + 600;
   a.busy = status !== 'idle' || report; a.workFor = report ? 8 : status === 'start' ? (a.hold ? 600 : 10) : 2.5;
-  if (a.loc !== loc || a.leaving) goTo(a, loc, status === 'idle' && !report);
+  const sword = a.look === 'swordsman', alive = sword ? liveEnemies(a).length : 0;
+  const outcome = !sword ? null : ev.outcome || (status === 'error' && !tool ? 'failed' : (report || (status === 'done' && !tool)) ? 'fixed' : null);
+  let stay = false;
+  if (sword && outcome === 'failed') stay = true;                                           // he falls where he stands
+  else if (sword && outcome === 'fixed' && alive) { a.pendingLoc = loc; stay = true; }       // finish the fight first, then go and report
+  if (!stay && (a.loc !== loc || a.leaving)) goTo(a, loc, status === 'idle' && !report);
   a.busyUntil = a.path.length ? Infinity : t + a.workFor;   // the work timer starts when they arrive
   say(a, text, status === 'idle' ? 'start' : status, report ? 6 : status === 'start' ? 6 : 3.5, report ? 'REPORT' : '');
   if (status === 'done') burst(a.x, a.y - 14, '#ffd23f', 8);
   if (status === 'error') { burst(a.x, a.y - 14, '#e5484d', 10); stats.errors++; }
   if (report) burst(a.x, a.y - 14, '#ff9ec0', 8);
+  if (sword) swordCombat(a, ev, status, tool, outcome, alive);
   stats.events++;
-  logEvent(a, text, report ? 'report' : status);
+  logEvent(a, text, report ? 'report' : outcome === 'failed' ? 'error' : status);
   $('#empty').classList.add('hide');
 }
 
@@ -461,6 +592,9 @@ const LOCATION_FX = { forge: ['#ff9a2a', 0.12], barracks: ['#ffffff', 0.4], libr
   castle: ['#ffd23f', 0.7], tavern: ['#ff9ec0', 0.8], arena: ['#ffffff', 0.14], theatre: ['#ff9ec0', 0.4] };
 
 function updateAgent(a, dt, t) {
+  if (a.dead) { a.deadT += dt; if (a.bubUntil && t > a.bubUntil) { a.bub.classList.remove('on'); a.bubUntil = 0; } if (a.deadT > 4.5) { a.el.remove(); agents.delete(a.id); } return; }
+  if (a.flash > 0) a.flash -= dt;
+  if (a.pendingLoc && t >= (a.victoryUntil || 0)) { goTo(a, a.pendingLoc); a.pendingLoc = null; a.busy = true; a.busyUntil = Infinity; a.workFor = 8; }
   a.anim += dt * (a.path.length ? clamp((a.speed || 56) / 70, 1, 2.2) : 1);
   if (a.path.length) {
     const p = a.path[0], dx = p[0] - a.x, dy = p[1] - a.y, d = Math.hypot(dx, dy), step = (a.speed || 56) * dt;
@@ -477,8 +611,8 @@ function updateAgent(a, dt, t) {
   if (a.path.length && a.bubUntil) a.bubUntil = Math.max(a.bubUntil, t + 3);          // keep the bubble up until they get there
   if (a.hold && t > a.holdUntil) a.hold = false;
   const idleFor = t - a.lastEvent;
-  if (!a.leaving && !a.hold && idleFor > 16 && !REST.includes(a.loc) && !a.path.length) { a.busy = false; goTo(a, pickRest(), true); }
-  if (!a.leaving && !a.hold && idleFor > 120) { a.leaving = true; a.loc = null; a.slot = null; if (a.path.length && a.path[a.path.length - 1].slot) a.path.pop(); else if (!a.path.length) a.path.push(nodePx(a.node)); for (const k of bfs(a.node, GATE).slice(1)) a.path.push(nodePx(k)); a.node = GATE; a.speed = 110; }
+  if (!a.leaving && !a.hold && idleFor > 16 && !REST.includes(a.loc) && !a.path.length) { a.busy = false; retreat(a); goTo(a, pickRest(), true); }
+  if (!a.leaving && !a.hold && idleFor > 120) { retreat(a); a.leaving = true; a.loc = null; a.slot = null; if (a.path.length && a.path[a.path.length - 1].slot) a.path.pop(); else if (!a.path.length) a.path.push(nodePx(a.node)); for (const k of bfs(a.node, GATE).slice(1)) a.path.push(nodePx(k)); a.node = GATE; a.speed = 110; }
   a.cheer = a.state === 'idle' && ((a.loc === 'stands' && fightOn) || (a.loc === 'audience' && showOn));
   const fx = a.state === 'working' ? LOCATION_FX[a.loc] : a.cheer ? ['#ffd23f', 0.8] : null;
   if (fx) { a.partT -= dt; if (a.partT <= 0) { a.partT = fx[1] * rand(.7, 1.3); burst(a.x + (a.cheer ? 0 : a.facing * 8), a.y - (a.cheer ? 20 : 6), fx[0], a.cheer ? 1 : 2, .7); } }
@@ -487,13 +621,23 @@ function updateAgent(a, dt, t) {
 
 function drawAgent(a) {
   let frame = 0, bob = 0;
-  if (a.state === 'walking') frame = [1, 0, 2, 0][Math.floor(a.anim * 8) % 4];
+  const sword = a.look === 'swordsman', fighting = sword && !a.dead && a.state === 'working' && enemiesOf(a).some(e => e.state === 'fight');
+  if (a.dead) frame = 0;
+  else if (a.state === 'walking') frame = [1, 0, 2, 0][Math.floor(a.anim * 8) % 4];
+  else if (fighting) frame = 3 + (Math.floor(a.anim * 6) % 2);                    // sword raised, sword forward
+  else if (sword && a.victoryUntil && now() < a.victoryUntil) bob = Math.floor(a.anim * 5) % 2 ? -3 : 0;   // victory hop
   else if (a.state === 'working') { frame = Math.floor(a.anim * (a.loc === 'arena' ? 7 : 5)) % 2 ? 1 : 0; bob = frame ? -1 : 0; }
   else if (a.cheer) bob = Math.floor(a.anim * 4) % 2 ? -2 : 0;
   else bob = Math.sin(a.anim * 2) > .6 ? -1 : 0;
-  const spr = getSprite(a, frame), x = Math.round(a.x), y = Math.round(a.y + bob);
-  ctx.save(); ctx.translate(x, y - 21 * SPR); ctx.scale(a.facing < 0 ? -SPR : SPR, SPR);
-  ctx.drawImage(spr, -10, 0); ctx.restore();
+  const spr = getSprite(a, frame), x = Math.round(a.x) + (a.flash > 0 ? (Math.floor(a.flash * 30) % 2 ? 1 : -1) : 0), y = Math.round(a.y + bob);
+  ctx.save();
+  if (a.flash > 0 && Math.floor(a.flash * 16) % 2) ctx.globalAlpha = 0.45;       // hit: blink
+  if (a.dead) {
+    ctx.translate(x, y); ctx.rotate((a.facing > 0 ? -1 : 1) * Math.min(1.5, a.deadT * 5)); if (a.deadT > 3) ctx.globalAlpha = Math.max(0, 1 - (a.deadT - 3) / 1.5);
+    ctx.scale(a.facing < 0 ? -SPR : SPR, SPR); ctx.drawImage(spr, -10, -21);
+  } else { ctx.translate(x, y - 21 * SPR); ctx.scale(a.facing < 0 ? -SPR : SPR, SPR); ctx.drawImage(spr, -10, 0); }
+  ctx.restore();
+  if (sword && !a.dead && enemiesOf(a).some(e => e.state === 'fight' || e.state === 'ride')) for (let h = 0; h < 3; h++) R(ctx, x - 8 + h * 6, y - 21 * SPR - 7, 5, 4, h < (a.hp === undefined ? 3 : a.hp) ? '#e5484d' : '#3a2a2a');   // hearts
 }
 
 /* ---------------------------------------------------------------- render */
@@ -529,8 +673,10 @@ function frame(ms) {
   const list = [...agents.values()];
   fightOn = list.some(o => o.loc === 'arena' && o.state === 'working'); showOn = list.some(o => o.loc === 'theatre' && o.state === 'working');
   for (const a of list) updateAgent(a, dt, t);
-  list.sort((p, q) => p.y - q.y);
-  for (const a of list) drawAgent(a);
+  updateEnemies(dt, t);
+  const items = list.map(a => ({ y: a.y, d: () => drawAgent(a) })).concat(enemies.filter(e => !(e.wait > 0)).map(e => ({ y: e.y, d: () => drawEnemy(e) })), graves.map(g => ({ y: g.y, d: () => drawGrave(g, t) })));
+  items.sort((p, q) => p.y - q.y);
+  for (const it of items) it.d();
   // particles
   for (let i = particles.length - 1; i >= 0; i--) { const p = particles[i]; p.life += dt; if (p.life > p.max) { particles.splice(i, 1); continue; }
     p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; ctx.globalAlpha = 1 - p.life / p.max; R(ctx, p.x, p.y, p.s, p.s, p.col); ctx.globalAlpha = 1; }
@@ -571,6 +717,8 @@ function logEvent(a, text, status) {
 }
 
 function statusOf(a) {
+  if (a.dead) return ['FALLEN', 'failed'];
+  if (a.look === 'swordsman' && liveEnemies(a).length) return ['FIGHTING', 'working'];
   if (a.leaving) return ['LEAVING', 'idle'];
   if (a.status === 'error' && a.busy === false && now() - a.lastEvent < 8) return ['FAILED', 'failed'];
   if (a.state === 'walking') return ['TRAVELING', 'walking'];
@@ -599,7 +747,8 @@ function renderAgents(body) {
   for (const a of list) {
     const [label, cls] = statusOf(a), c = el('div', 'card'); c.style.setProperty('--c', a.color);
     const top = el('div', 'top'); top.append(el('span', 'nm2', a.name + (a.title ? ' · ' + a.title : '')), el('span', 'pill ' + cls, label));
-    c.append(top, el('div', 'txt', a.text || 'Waiting for work'), el('div', 'meta', placeName(a) + ' · last activity ' + fmtTime(now() - a.lastEvent) + ' ago'));
+    const foes = a.look === 'swordsman' ? liveEnemies(a).length : 0;
+    c.append(top, el('div', 'txt', a.text || 'Waiting for work'), el('div', 'meta', placeName(a) + (foes ? ' · ' + foes + ' enem' + (foes === 1 ? 'y' : 'ies') : '') + ' · last activity ' + fmtTime(now() - a.lastEvent) + ' ago'));
     body.append(c);
   }
 }
@@ -674,7 +823,7 @@ function connect() {
 window.Realm = { emit, setBadge };
 
 buildStatic(); fit();
-const rolesLoaded = location.protocol === 'file:' ? Promise.resolve() : fetch('/roles.json').then(r => r.json()).then(j => { ROLEDEF = j.roles || {}; }).catch(() => {});
+const rolesLoaded = location.protocol === 'file:' ? Promise.resolve() : fetch('/roles.json').then(r => r.json()).then(j => { ROLECFG = { jobs: j.jobs || {}, roles: j.roles || {} }; }).catch(() => {});
 rolesLoaded.then(() => {
   connect();
   if (/[?&]demo\b/.test(location.search)) setTimeout(() => { window.RealmSim.start(); setBadge(); }, 300);

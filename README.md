@@ -2,7 +2,7 @@
 
 **Watch your AI agents work, as a medieval town.**
 
-Every agent role is a named pixel character. The tool it is using decides where it walks: readers go to the
+Every agent role is a pixel character with a job title. The tool it is using decides where it walks: readers go to the
 library, coders to the forge, shell commands to the barracks, test runs to the arena, and when an agent
 finishes, it presents its report on the theatre stage. Works with **Claude Code, Codex, Qwen Code and Cursor**.
 
@@ -96,32 +96,55 @@ Hooks never block your agent: they exit 0 within a second even when the show isn
 
 ## The town
 
-### The cast (roles, not tasks)
+### The cast: jobs, not people
 
-A character is an **agent role**. It keeps its identity while its work changes. The default cast in
-[`roles.json`](roles.json) matches an orchestrated, phase-based system:
+Characters have **job titles, not names**. A job is a look, a home place and a list of name patterns, so **any agent whose
+role name matches a job takes that job**, even one the town has never seen. The second line of the nameplate is a specialty
+(`Craftsman · Flutter`).
 
-| Role | Character | Look |
-|---|---|---|
-| orchestrator (the main session) | Lord Aldric, Conductor | Governor |
-| intake-auditor | Brother Osric, Herald of Intake | Herald |
-| spec-author | Maud, Scribe of Specs | Scribe |
-| spec-reviewer / plan-reviewer / coverage-reviewer | Magistrates Hartwin, Ysolde, Wulfric | Judge |
-| feature-architect | Master Godric, Architect | Architect |
-| task-planner | Steward Bran, Keeper of Tasks | Steward |
-| flutter-expert / kotlin-specialist / node-specialist | Sir Percival, Sir Galen, Sir Tristan | Knights (blue, purple, green shield) |
-| sql-pro | Dame Ingrid, Keeper of the Archives | Archivist |
-| code-reviewer | Sir Cedric the Just | Knight in silver |
-| qa-verifier | Captain Roderic, Inquisitor | Inquisitor |
-| test-scenario-designer | Pip the Jester | Jester |
-| debugger | Doctor Corvin | Plague doctor |
-| performance-engineer | Alchemist Thorne | Alchemist |
-| final-auditor | High Justice Eadric | Judge in purple |
+| Job | Takes any role about | Pinned examples | Look |
+|---|---|---|---|
+| **Craftsman** | coding, developing, implementing | flutter-expert, kotlin-specialist, node-specialist, sql-pro | Apron and hammer |
+| **Master Craftsmen** | reviewing code, architecture and design | code-reviewer, feature-architect, plan-reviewer | Green apron, cap and magnifier |
+| **Guild Inspector** | QA, testing, verifying, auditing | qa-verifier, test-scenario-designer, performance-engineer, final-auditor | Hooded, with a lantern |
+| **Chancellor** | business analysis, gathering and clarifying requirements, specs | intake-auditor, business-analyst, spec-author, spec-reviewer, coverage-reviewer | Navy robe, chain and scroll |
+| **Swordsman** | fixing bugs, issues and mistakes | debugger, bug-fixer | Helm, red scarf and sword. [Fights enemies](#the-swordsman-and-the-bugs) |
+| **Royal Steward** | orchestrating, coordinating, planning tasks | orchestrator, task-planner | Green coat, ledger and keys |
+| **Keeper of the Arsenal** | deploying and releasing | release-engineer | Helm, halberd and key ring |
+| **Royal Scribe** | reporting and summarising | reporter | Blue hat and book |
+| **Keeper of Records** | context files, notes, memory, documentation | context-engineer | Glasses, key and ledger |
 
-Agents with a role that isn't in the file still appear, as a villager. Make your own cast:
-`agent-realm roles --init` writes `agent-realm.roles.json` here (picked up automatically), or use
-`agent-realm start --roles my-roles.json`. Each role has `name`, `title`, `look`, optional `body` / `accent`
-colours, a `home` place and a list of `tasks`. `agent-realm roles` lists the cast in use.
+Roles that match no job still appear: the job follows the first place the agent works at (a shell command makes it a Craftsman, a test run a Guild Inspector...)
+and its role name becomes the second line.
+
+**Your own cast.** `agent-realm roles --init` writes `agent-realm.roles.json` here (picked up automatically), or use `agent-realm start --roles my.json`.
+The file has two parts:
+
+```json
+{
+  "jobs":  { "Swordsman": { "look": "swordsman", "home": "barracks", "match": ["debug", "(^|-)bug", "incident"] } },
+  "roles": { "debugger":  { "job": "Swordsman", "specialty": "Debugging" } }
+}
+```
+
+`match` entries are case-insensitive regular expressions tested against the agent's role name; the **first job that matches wins**, so specific jobs come first.
+`look` picks a sprite (`worker`, `master`, `inquisitor`, `chancellor`, `swordsman`, `steward`, `arsenal`, `scribe`, `archivist`, and older ones such as `knight`, `judge`, `jester`),
+`home` is where the job stands when its own tool activity is unknown. `agent-realm roles` lists everything in use.
+
+### The Swordsman and the bugs
+
+Bugs, issues and mistakes are **enemies**: outriders on horseback with red eyes and bug antennae. They ride in from the south gate when a Swordsman starts a fix and
+fight him wherever he goes.
+
+| What happens | When |
+|---|---|
+| 2 outriders ride in and surround him; 3 hearts appear over his head | the Swordsman's first event of a job (send `enemies: 1..6` to choose how many) |
+| He is **wounded** (a heart is lost and he blinks) | a tool call fails during the fix (Qwen Code and Cursor report these). The third wound is fatal |
+| He **cuts them down**, one by one, then does a victory hop and goes to present his report | the fix is done: a subagent finishing, a final `done`, or `outcome: "fixed"` |
+| He **falls**, a gravestone appears and the outriders cheer, then ride off | the fix failed: a final `error` (no tool), a failed subagent, or `outcome: "failed"` |
+
+A fallen Swordsman is replaced by a fresh one on the next event. Claude Code doesn't report tool failures to hooks, so there the Swordsman wins unless an agent
+reports a failure itself (see [Event format](#event-format)).
 
 ### Where they stand
 
@@ -211,7 +234,8 @@ curl -X POST localhost:4747/event -H 'Content-Type: application/json' \
 
 Fields: `agent` (id, required), `status` (`start` | `done` | `error` | `idle`), `tool`, `text`, and optional `role` (a key from
 roles.json), `name`, `project`, `location` (castle, library, forge, barracks, market, docks, farm, tavern, arena, theatre),
-`activity: "report"` (present on the theatre stage) and `hold: true` (stay on duty until a later event for the same agent).
+`activity: "report"` (present on the theatre stage), `hold: true` (stay on duty until a later event for the same agent), and, for a Swordsman,
+`enemies: n` (how many bugs ride in) and `outcome: "fixed" | "failed"` (he wins, or he falls).
 
 ## Troubleshooting
 

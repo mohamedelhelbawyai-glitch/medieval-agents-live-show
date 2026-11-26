@@ -1,6 +1,6 @@
 ## Agent Realm (live pixel show)
 
-Codex tool activity in this workspace is streamed to **Agent Realm**, a live pixel-art medieval town at http://localhost:4747, through Codex hooks. The tool in use decides where the character walks (shell commands to the Barracks, test runs to the Arena, `apply_patch` to the Forge, MCP tools to the Docks, `update_plan` and subagents to the Castle), and a finished turn is presented on the Theatre stage.
+Codex tool activity in this workspace is streamed to **Agent Realm**, a live pixel-art medieval town at http://localhost:4747, through Codex hooks. Each agent becomes a character with a job title (Craftsman, Master Craftsmen, Guild Inspector, Chancellor, Swordsman, Royal Steward, Keeper of the Arsenal, Royal Scribe or Keeper of Records; see `roles.json`). The tool in use decides where the character walks (shell commands to the Barracks, test runs to the Arena, `apply_patch` to the Forge, MCP tools to the Docks, `update_plan` and subagents to the Castle), and a finished turn is presented on the Theatre stage.
 
 - Do not edit or remove the Agent Realm entries in `hooks.json`; use `agent-realm hooks uninstall --agent codex` instead.
 - Codex asks you to review new hooks the first time: open `/hooks` and trust the Agent Realm entries.

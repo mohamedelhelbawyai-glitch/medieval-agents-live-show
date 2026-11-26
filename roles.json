@@ -1,41 +1,293 @@
 {
-  "_comment": "Each key is an agent name (the subagent_type Claude Code launches). 'look' picks a sprite, 'body' and 'accent' recolour it, 'home' is where the character stands when its own tool activity is unknown. Places: castle, library, forge, barracks, market, docks, farm, tavern, arena, theatre.",
+  "_comment": "Characters are jobs, not people. 'jobs' define a look, a home place and name patterns (regex, matched against the agent's role id): any agent whose role id matches a job's patterns takes that job. 'roles' pin a specific agent name to a job and add a specialty (second line of the nameplate). Order matters: the first job that matches wins, so specific jobs come first. Places: castle, library, forge, barracks, market, docks, farm, tavern, arena, theatre.",
+  "jobs": {
+    "Swordsman": {
+      "look": "swordsman",
+      "home": "barracks",
+      "match": [
+        "debug",
+        "(^|-)bug",
+        "fix(er)?($|-)",
+        "hotfix",
+        "incident",
+        "troubleshoot",
+        "triage",
+        "(^|-)issue",
+        "regression",
+        "firefight"
+      ],
+      "tasks": [
+        "Hunts down bugs, issues and mistakes",
+        "Enemies appear while a fix is in progress; they fall when it is fixed",
+        "Falls in battle if the fix fails"
+      ]
+    },
+    "Keeper of the Arsenal": {
+      "look": "arsenal",
+      "home": "docks",
+      "match": [
+        "deploy",
+        "release",
+        "devops",
+        "(^|-)(ci|cd)($|-)",
+        "(^|-)ship",
+        "publish",
+        "(^|-)infra",
+        "(^|-)sre($|-)",
+        "rollout",
+        "pipeline"
+      ],
+      "tasks": [
+        "Deploys and releases",
+        "Guards the pipeline and the build artefacts"
+      ]
+    },
+    "Royal Scribe": {
+      "look": "scribe",
+      "home": "library",
+      "match": [
+        "report",
+        "scribe",
+        "summar",
+        "changelog",
+        "release-notes",
+        "status-update"
+      ],
+      "tasks": [
+        "Writes reports and summaries",
+        "Presents results on the theatre stage"
+      ]
+    },
+    "Keeper of Records": {
+      "look": "archivist",
+      "home": "farm",
+      "match": [
+        "context",
+        "(^|-)record",
+        "memory",
+        "(^|-)docs?($|-)",
+        "documentation",
+        "knowledge",
+        "markdown",
+        "archiv",
+        "(^|-)notes?($|-)"
+      ],
+      "tasks": [
+        "Keeps the context: markdown files, notes and memory",
+        "Context engineering for the other agents"
+      ]
+    },
+    "Chancellor": {
+      "look": "chancellor",
+      "home": "castle",
+      "match": [
+        "analyst",
+        "business",
+        "requirement",
+        "clarif",
+        "intake",
+        "(^|-)specs?($|-)",
+        "specification",
+        "product",
+        "stakeholder",
+        "(^|-)ba($|-)",
+        "explor",
+        "research",
+        "investigat",
+        "discovery",
+        "user-stor"
+      ],
+      "tasks": [
+        "Gathers requirements and clarifies them",
+        "Turns requests into specifications"
+      ]
+    },
+    "Guild Inspector": {
+      "look": "inquisitor",
+      "home": "arena",
+      "match": [
+        "(^|-)qa($|-)",
+        "quality",
+        "test",
+        "verif",
+        "inspect",
+        "audit",
+        "validat",
+        "acceptance",
+        "benchmark",
+        "(^|-)perf"
+      ],
+      "tasks": [
+        "Checks the work: tests, QA, verification",
+        "Runs the suite and checks every acceptance scenario with evidence"
+      ]
+    },
+    "Master Craftsmen": {
+      "look": "master",
+      "home": "library",
+      "match": [
+        "code-review",
+        "review",
+        "(^|-)architect",
+        "(^|-)design",
+        "senior",
+        "(^|-)lint"
+      ],
+      "tasks": [
+        "Reviews code and designs",
+        "Read-only: reports findings, the caller decides what to fix"
+      ]
+    },
+    "Royal Steward": {
+      "look": "steward",
+      "home": "castle",
+      "match": [
+        "orchestrat",
+        "conduct",
+        "coordinat",
+        "manager",
+        "(^|-)lead($|-)",
+        "planner",
+        "steward",
+        "supervis",
+        "(^|-)main($|-)"
+      ],
+      "tasks": [
+        "Routes work to the right agent",
+        "Plans tasks and hands work off between phases"
+      ]
+    },
+    "Craftsman": {
+      "look": "worker",
+      "home": "forge",
+      "match": [
+        "(^|-)dev($|-)",
+        "develop",
+        "engineer",
+        "coder",
+        "programm",
+        "implement",
+        "build",
+        "specialist",
+        "expert",
+        "frontend",
+        "backend",
+        "fullstack",
+        "mobile",
+        "flutter",
+        "kotlin",
+        "swift",
+        "android",
+        "(^|-)ios",
+        "node",
+        "python",
+        "java",
+        "react",
+        "(^|-)sql",
+        "golang",
+        "rust",
+        "(^|-)web($|-)",
+        "general",
+        "worker"
+      ],
+      "tasks": [
+        "Writes and changes code",
+        "Builds features, test first"
+      ]
+    }
+  },
   "roles": {
-    "orchestrator": { "name": "Lord Aldric", "title": "Conductor", "look": "governor", "home": "castle",
-      "tasks": ["Routes work to the right agent", "Splits tasks and hands off between phases", "Collects results and reports to you"] },
-    "intake-auditor": { "name": "Brother Osric", "title": "Herald of Intake", "look": "herald", "accent": "#d9a521", "home": "castle",
-      "tasks": ["Checks the intake is complete", "Makes sure inputs are in your words and not invented"] },
-    "spec-author": { "name": "Maud", "title": "Scribe of Specs", "look": "scribe", "home": "library",
-      "tasks": ["Writes spec.md from the approved intake", "Adds no scope of its own"] },
-    "spec-reviewer": { "name": "Magistrate Hartwin", "title": "Spec Judge", "look": "judge", "home": "library",
-      "tasks": ["Reviews spec.md for traceability and testability", "Read-only: reports findings, never edits"] },
-    "feature-architect": { "name": "Master Godric", "title": "Architect", "look": "architect", "home": "castle",
-      "tasks": ["Writes plan.md, research, data model and contracts", "Follows the project rules; writes no product code"] },
-    "plan-reviewer": { "name": "Magistrate Ysolde", "title": "Plan Judge", "look": "judge", "accent": "#8a2430", "home": "library",
-      "tasks": ["Checks plan.md against the spec and the constitution", "Read-only"] },
-    "task-planner": { "name": "Steward Bran", "title": "Keeper of Tasks", "look": "steward", "home": "castle",
-      "tasks": ["Turns the approved plan into an ordered, test-first tasks.md"] },
-    "coverage-reviewer": { "name": "Magistrate Wulfric", "title": "Coverage Judge", "look": "judge", "accent": "#2f5fb8", "home": "library",
-      "tasks": ["Cross-checks spec, plan and tasks for gaps and contradictions", "Read-only"] },
-    "flutter-expert": { "name": "Sir Percival", "title": "Flutter Knight", "look": "knight", "accent": "#2f5fb8", "home": "forge",
-      "tasks": ["Implements Flutter tasks, test first", "BLoC/Cubit, widgets, platform channels"] },
-    "kotlin-specialist": { "name": "Sir Galen", "title": "Kotlin Knight", "look": "knight", "accent": "#8a3fc0", "home": "forge",
-      "tasks": ["Implements Kotlin work: coroutines, Flow, Compose, Ktor", "Test first"] },
-    "node-specialist": { "name": "Sir Tristan", "title": "Node Knight", "look": "knight", "accent": "#2f9a4a", "home": "forge",
-      "tasks": ["Builds Node.js APIs, services and CLIs", "Test first"] },
-    "sql-pro": { "name": "Dame Ingrid", "title": "Keeper of the Archives", "look": "archivist", "home": "farm",
-      "tasks": ["Designs queries, schemas and migrations", "Reads execution plans before optimising"] },
-    "code-reviewer": { "name": "Sir Cedric", "title": "the Just", "look": "knight", "body": "#c9ccd6", "accent": "#ffd23f", "home": "library",
-      "tasks": ["Reviews diffs for correctness, security and performance", "Read-only: the caller decides what to fix"] },
-    "qa-verifier": { "name": "Captain Roderic", "title": "Inquisitor", "look": "inquisitor", "home": "arena",
-      "tasks": ["Runs the app and test suite", "Checks every acceptance scenario with evidence", "Never edits code"] },
-    "test-scenario-designer": { "name": "Pip", "title": "the Jester", "look": "jester", "accent": "#2f5fb8", "home": "library",
-      "tasks": ["Designs happy, negative, boundary and edge-case scenarios", "Tries to break the feature on paper"] },
-    "debugger": { "name": "Doctor Corvin", "title": "Plague Doctor", "look": "plaguedoctor", "home": "barracks",
-      "tasks": ["Finds the root cause with evidence", "Does not fix by guessing"] },
-    "performance-engineer": { "name": "Alchemist Thorne", "title": "Measurer", "look": "alchemist", "home": "barracks",
-      "tasks": ["Profiles and finds bottlenecks with a baseline", "Load tests, caching, scaling"] },
-    "final-auditor": { "name": "High Justice Eadric", "title": "Final Auditor", "look": "judge", "body": "#4a1f5e", "accent": "#ffd23f", "home": "castle",
-      "tasks": ["Re-checks the QA evidence against the Definition of Done", "Read-only, last gate before the final report"] }
+    "orchestrator": {
+      "job": "Royal Steward",
+      "specialty": "Conductor"
+    },
+    "task-planner": {
+      "job": "Royal Steward",
+      "specialty": "Tasks"
+    },
+    "intake-auditor": {
+      "job": "Chancellor",
+      "specialty": "Intake"
+    },
+    "business-analyst": {
+      "job": "Chancellor",
+      "specialty": "Requirements"
+    },
+    "spec-author": {
+      "job": "Chancellor",
+      "specialty": "Specs"
+    },
+    "spec-reviewer": {
+      "job": "Chancellor",
+      "specialty": "Spec review"
+    },
+    "coverage-reviewer": {
+      "job": "Chancellor",
+      "specialty": "Coverage"
+    },
+    "feature-architect": {
+      "job": "Master Craftsmen",
+      "specialty": "Architecture"
+    },
+    "plan-reviewer": {
+      "job": "Master Craftsmen",
+      "specialty": "Plan review"
+    },
+    "code-reviewer": {
+      "job": "Master Craftsmen",
+      "specialty": "Code review"
+    },
+    "flutter-expert": {
+      "job": "Craftsman",
+      "specialty": "Flutter"
+    },
+    "kotlin-specialist": {
+      "job": "Craftsman",
+      "specialty": "Kotlin"
+    },
+    "node-specialist": {
+      "job": "Craftsman",
+      "specialty": "Node"
+    },
+    "sql-pro": {
+      "job": "Craftsman",
+      "specialty": "SQL"
+    },
+    "qa-verifier": {
+      "job": "Guild Inspector",
+      "specialty": "QA"
+    },
+    "test-scenario-designer": {
+      "job": "Guild Inspector",
+      "specialty": "Scenarios"
+    },
+    "performance-engineer": {
+      "job": "Guild Inspector",
+      "specialty": "Performance"
+    },
+    "final-auditor": {
+      "job": "Guild Inspector",
+      "specialty": "Final audit"
+    },
+    "debugger": {
+      "job": "Swordsman",
+      "specialty": "Debugging"
+    },
+    "bug-fixer": {
+      "job": "Swordsman",
+      "specialty": "Bug fixing"
+    },
+    "release-engineer": {
+      "job": "Keeper of the Arsenal",
+      "specialty": "Release"
+    },
+    "reporter": {
+      "job": "Royal Scribe",
+      "specialty": "Reports"
+    },
+    "context-engineer": {
+      "job": "Keeper of Records",
+      "specialty": "Context"
+    }
   }
 }
